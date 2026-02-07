@@ -58,16 +58,16 @@
 ## 📥 Installation
 
 ### Option 1: Download Pre-built Executable (Recommended)
-1. Download `GitFlow-Pro-v6.2.exe` from the [Releases](https://github.com/YEXIU21/GITFLOW-PRO/releases) page
+1. Download `Dev-X-Flow-Pro-v7.0.exe` from the [Releases](https://github.com/YEXIU21/Dev-X-Flow-Pro/releases) page
 2. Run the executable - no installation required!
 
 ### Option 2: Run from Source
 ```bash
 # Clone the repository
-git clone https://github.com/YEXIU21/GITFLOW-PRO.git
+git clone https://github.com/YEXIU21/Dev-X-Flow-Pro.git
 
 # Navigate to project directory
-cd GITFLOW-PRO
+cd Dev-X-Flow-Pro
 
 # Install dependencies
 pip install requests pillow
@@ -86,7 +86,7 @@ python "Dev-X-Flow-Pro/Dev-X-Flow-Pro.py"
 ## 🚀 Usage
 
 ### Getting Started
-1. **Launch GitFlow Pro**
+1. **Launch Dev-X-Flow-Pro**
 2. **Select Repository:** Click "Browse" or enter repository path
 3. **Initialize (if needed):** Click "⚡ Init Repo" for new repositories
 
@@ -130,15 +130,16 @@ Use the **"⚡ Sync to Main"** button for:
 ## 🛠️ Project Structure
 
 ```
-GITFLOW-PRO/
+Dev-X-Flow-Pro/
 ├── Dev-X-Flow-Pro/
 │   ├── Dev-X-Flow-Pro.py          # Main application file
 │   ├── AI_COMMIT_MESSAGE_DOCS.md # AI feature documentation
-│   ├── app.ico                 # Application icon
-│   └── devXflowpro.png         # Logo for splash screen and window icon
-├── exe/                        # Build output folder (empty - build new executables with PyInstaller)
+│   ├── app.ico                    # Application icon
+│   ├── window_icon.png            # Window icon (32x32)
+│   └── devXflowpro.png            # Logo for splash screen
+├── exe/                           # Build output folder
 ├── .gitignore
-└── README.md                   # This file
+└── README.md                      # This file
 ```
 
 ---
@@ -150,7 +151,7 @@ GITFLOW-PRO/
 </p>
 
 <p align="center">
-  <a href="https://github.com/franz">
+  <a href="https://github.com/StefanSalvatoreWP">
     <img src="https://img.shields.io/badge/Franz-Developer-blue?style=for-the-badge&logo=github" alt="Franz">
   </a>
   <a href="https://github.com/YEXIU21">
