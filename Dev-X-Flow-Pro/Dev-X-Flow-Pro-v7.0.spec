@@ -7,9 +7,8 @@ a = Analysis(
     binaries=[],
     datas=[
         ('devXflowpro.png', '.'),
+        ('window_icon.png', '.'),
         ('app.ico', '.'),
-        ('..\\DATABASE IMPORTER\\mysql_master.ps1', 'DATABASE IMPORTER'),
-        ('..\\DATABASE IMPORTER\\mysql_master.bat', 'DATABASE IMPORTER'),
     ],
     hiddenimports=[],
     hookspath=[],
