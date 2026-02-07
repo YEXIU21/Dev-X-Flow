@@ -16,14 +16,23 @@ class GitGUI:
         
         # Set window icon - handle both script and bundled exe modes
         try:
+            ico_path = self._get_resource_path("app.ico")
+            if os.path.exists(ico_path):
+                try:
+                    self.root.iconbitmap(ico_path)
+                    print(f"Icon ICO loaded successfully from: {ico_path}")
+                except Exception:
+                    pass
+
             icon_path = self._get_resource_path("devXflowpro.png")
             if os.path.exists(icon_path):
-                icon_img = tk.PhotoImage(file=icon_path)
-                self.root.iconphoto(True, icon_img)
-                self.window_icon = icon_img  # Keep reference
-                print(f"Icon loaded successfully from: {icon_path}")
-            else:
-                print(f"Icon file not found at: {icon_path}")
+                try:
+                    icon_img = tk.PhotoImage(file=icon_path)
+                    self.root.iconphoto(True, icon_img)
+                    self.window_icon = icon_img  # Keep reference
+                    print(f"Icon PNG loaded successfully from: {icon_path}")
+                except Exception:
+                    pass
         except Exception as e:
             print(f"Could not load icon: {e}")
         
@@ -525,6 +534,66 @@ class GitGUI:
         
         # Tab 10: Database Import
         self.create_database_tab()
+
+    def create_database_tab(self):
+        tab = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(tab, text="Database")
+
+        header = ttk.Label(tab, text="Database Tools", font=("Segoe UI", 11, "bold"))
+        header.pack(anchor="w", padx=10, pady=(10, 6))
+
+        desc = ttk.Label(
+            tab,
+            text="Launch the MySQL Master Tool (PowerShell) from inside Dev-X-Flow-Pro.",
+            font=("Segoe UI", 10),
+            justify="left",
+        )
+        desc.pack(anchor="w", padx=10, pady=(0, 10))
+
+        ttk.Button(
+            tab,
+            text="🚀 Launch MySQL Master Tool",
+            command=self.launch_mysql_master_tool,
+            style="Success.TButton",
+        ).pack(anchor="w", padx=10, pady=(0, 10))
+
+        self.db_tools_status = ttk.Label(tab, text="", font=("Segoe UI", 9))
+        self.db_tools_status.pack(anchor="w", padx=10)
+
+    def launch_mysql_master_tool(self):
+        try:
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+            ps1_path = os.path.join(base_dir, "DATABASE IMPORTER", "mysql_master.ps1")
+
+            # If bundled via PyInstaller datas, it may exist under _MEIPASS
+            try:
+                bundle_base = sys._MEIPASS
+                bundled_ps1 = os.path.join(bundle_base, "DATABASE IMPORTER", "mysql_master.ps1")
+                if os.path.exists(bundled_ps1):
+                    ps1_path = bundled_ps1
+            except Exception:
+                pass
+
+            if not os.path.exists(ps1_path):
+                self.db_tools_status.config(text=f"mysql_master.ps1 not found: {ps1_path}")
+                return
+
+            creation_flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+            subprocess.Popen(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    ps1_path,
+                ],
+                cwd=os.path.dirname(ps1_path),
+                creationflags=creation_flags,
+            )
+            self.db_tools_status.config(text="MySQL Master Tool launched.")
+        except Exception as e:
+            self.db_tools_status.config(text=f"Failed to launch MySQL Master Tool: {e}")
 
     def create_status_tab(self):
         """Create the Status & Commit tab"""
