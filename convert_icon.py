@@ -7,8 +7,8 @@ import os
 
 def convert_png_to_ico():
     # Source PNG file
-    source_png = "GitFlow Pro/devXflowpro.png"
-    output_ico = "GitFlow Pro/app.ico"
+    source_png = "Dev-X-Flow-Pro/window_icon.png"
+    output_ico = "Dev-X-Flow-Pro/app.ico"
     
     # Check if source exists
     if not os.path.exists(source_png):
