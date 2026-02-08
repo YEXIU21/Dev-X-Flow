@@ -557,7 +557,7 @@ class SQLServerAdapter(DatabaseAdapter):
 class GitGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Dev-X-Flow-Pro v7.1")
+        self.root.title("Dev-X-Flow-Pro v7.1.1")
         
         # Set window icon - handle both script and bundled exe modes
         try:
@@ -743,7 +743,7 @@ class GitGUI:
                 "extract_response": lambda r: r.json()["choices"][0]["message"]["content"].strip()
             }
         }
-        
+
         # Command templates for different project types
         self.command_templates = {
             "Laravel": [
@@ -811,16 +811,49 @@ class GitGUI:
                 "cd ..",
             ]
         }
-        
+
         # Initialize repository directory
         self.repo_dir = self.load_last_repo() or os.getcwd()
         self.is_git_repo = tk.BooleanVar(value=False)
         self.current_branch = tk.StringVar()
-        
+
         self.load_command_history()
         self.create_widgets()
         self.check_git_repo()
         self.detect_project_type()
+
+    def _apply_dark_combobox_popdown(self, combobox):
+        try:
+            popdown = combobox.tk.eval(f"ttk::combobox::PopdownWindow {combobox}")
+            listbox_path = f"{popdown}.f.l"
+            combobox.tk.call(
+                listbox_path,
+                "configure",
+                "-background",
+                self.colors["secondary"],
+                "-foreground",
+                "white",
+                "-selectbackground",
+                self.colors["accent"],
+                "-selectforeground",
+                "white",
+                "-highlightthickness",
+                "0",
+                "-borderwidth",
+                "0",
+                "-relief",
+                "flat",
+            )
+        except Exception:
+            pass
+
+    def _bind_dark_combobox(self, combobox):
+        self._apply_dark_combobox_popdown(combobox)
+        combobox.bind(
+            "<Button-1>",
+            lambda _e, cb=combobox: self._apply_dark_combobox_popdown(cb),
+            add="+",
+        )
 
     def _ensure_mysql_db_selected(self):
         if self.db_type.get() != "MySQL/MariaDB":
@@ -962,7 +995,7 @@ class GitGUI:
             label.pack(expand=True)
         
         # Version text
-        version_label = tk.Label(splash, text="v7.1", font=("Segoe UI", 12), 
+        version_label = tk.Label(splash, text="v7.1.1", font=("Segoe UI", 12), 
                                   bg="#1e1e1e", fg="#888888")
         version_label.pack()
         
@@ -1075,6 +1108,21 @@ class GitGUI:
                        padding=[15, 8], font=("Segoe UI", 10))
         style.map("TNotebook.Tab", background=[('selected', self.colors["accent"])], 
                  foreground=[('selected', 'white')])
+
+        style.configure(
+            "TCombobox",
+            fieldbackground=self.colors["secondary"],
+            background=self.colors["secondary"],
+            foreground="white",
+            arrowcolor="white",
+            selectbackground=self.colors["accent"],
+            selectforeground="white",
+        )
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", self.colors["secondary"]), ("!disabled", self.colors["secondary"])],
+            foreground=[("readonly", "white"), ("!disabled", "white")],
+        )
 
     def create_widgets(self):
         # Main Container
@@ -1858,7 +1906,8 @@ class GitGUI:
                                       values=list(self.ai_providers.keys()),
                                       state="readonly",
                                       width=20)
-        provider_combo.pack(side="left")
+        provider_combo.pack(side="left", fill="x", expand=True)
+        self._bind_dark_combobox(provider_combo)
         
         # Provider info label
         provider_info = tk.Label(dialog, text="", 
@@ -2256,12 +2305,23 @@ Continue?"""
                                      values=["Laravel", "Node.js", "Python", "General"],
                                      state="readonly", width=12)
         project_combo.pack(side="left", padx=5)
+        self._bind_dark_combobox(project_combo)
         project_combo.bind("<<ComboboxSelected>>", lambda e: self.update_terminal_suggestions())
         
         # Suggestions Toggle
-        ttk.Checkbutton(controls, text="Enable Suggestions", 
-                       variable=self.suggestions_enabled,
-                       command=self.toggle_suggestions).pack(side="left", padx=10)
+        tk.Checkbutton(
+            controls,
+            text="Enable Suggestions",
+            variable=self.suggestions_enabled,
+            command=self.toggle_suggestions,
+            bg=self.colors["bg"],
+            fg=self.colors["fg"],
+            activebackground=self.colors["bg"],
+            activeforeground=self.colors["fg"],
+            selectcolor=self.colors["bg"],
+            highlightthickness=0,
+            bd=0,
+        ).pack(side="left", padx=10)
         
         # Refresh & Clear Buttons
         ttk.Button(controls, text="↻ Detect Project", command=self.detect_project_type,
@@ -2620,9 +2680,19 @@ Continue?"""
         self.log_info_label.pack(side="left", padx=(0, 10))
         
         # Auto-refresh toggle
-        ttk.Checkbutton(controls, text="Auto-refresh",
-                       variable=self.log_auto_refresh,
-                       command=self.toggle_log_refresh).pack(side="left", padx=5)
+        tk.Checkbutton(
+            controls,
+            text="Auto-refresh",
+            variable=self.log_auto_refresh,
+            command=self.toggle_log_refresh,
+            bg=self.colors["bg"],
+            fg=self.colors["fg"],
+            activebackground=self.colors["bg"],
+            activeforeground=self.colors["fg"],
+            selectcolor=self.colors["bg"],
+            highlightthickness=0,
+            bd=0,
+        ).pack(side="left", padx=5)
         
         # Control buttons
         ttk.Button(controls, text="↻ Refresh Now", command=self.refresh_debug_logs,
@@ -2693,6 +2763,7 @@ Continue?"""
                                    values=["working", "staged", "HEAD~1", "HEAD~2", "HEAD~3"],
                                    width=15, state="readonly")
         source_combo.pack(side="left", padx=5)
+        self._bind_dark_combobox(source_combo)
         
         ttk.Label(controls, text="with").pack(side="left", padx=5)
         
@@ -2701,6 +2772,7 @@ Continue?"""
                                    values=["HEAD", "HEAD~1", "HEAD~2", "HEAD~3", "origin/main"],
                                    width=15, state="readonly")
         target_combo.pack(side="left", padx=5)
+        self._bind_dark_combobox(target_combo)
         
         ttk.Button(controls, text="🔍 Show Diff", command=self.show_diff,
                   style="Action.TButton").pack(side="left", padx=(10, 5))
@@ -3110,6 +3182,7 @@ Continue?"""
                                  values=["HEAD~3", "HEAD~5", "HEAD~10", "HEAD~20", "origin/main"],
                                  width=15, state="readonly")
         base_combo.pack(side="left", padx=5)
+        self._bind_dark_combobox(base_combo)
         
         ttk.Button(controls, text="🔄 Load Commits", command=self.load_rebase_commits,
                   style="Secondary.TButton").pack(side="left", padx=(10, 5))
@@ -3199,6 +3272,7 @@ Continue?"""
                                           values=["pick", "reword", "edit", "squash", "fixup", "drop"],
                                           width=10, state="readonly")
                 action_combo.pack(side="left", padx=5)
+                self._bind_dark_combobox(action_combo)
                 
                 # Commit hash
                 ttk.Label(row, text=commit_hash[:7], font=("Consolas", 9), 
@@ -3733,13 +3807,15 @@ Continue?"""
         row1.pack(fill="x")
 
         ttk.Label(row1, text="DB Type:").pack(side="left", padx=(0, 5))
-        ttk.Combobox(
+        db_type_cb = ttk.Combobox(
             row1,
             textvariable=self.db_type,
             values=["MySQL/MariaDB", "PostgreSQL", "SQL Server", "SQLite"],
-            width=14,
             state="readonly",
-        ).pack(side="left", padx=(0, 15))
+            width=18,
+        )
+        db_type_cb.pack(side="left", padx=(0, 10))
+        self._bind_dark_combobox(db_type_cb)
         
         ttk.Label(row1, text="Host:").pack(side="left", padx=(0, 5))
         host_entry = tk.Entry(row1, textvariable=self.db_host, 
@@ -3760,8 +3836,19 @@ Continue?"""
         pass_entry.pack(side="left", padx=(0, 5))
         
         # Custom Port Toggle
-        ttk.Checkbutton(row1, text="Custom Port", variable=self.db_use_custom_port,
-                       command=self.toggle_port_field).pack(side="left", padx=(20, 5))
+        tk.Checkbutton(
+            row1,
+            text="Custom Port",
+            variable=self.db_use_custom_port,
+            command=self.toggle_port_field,
+            bg=self.colors["bg"],
+            fg=self.colors["fg"],
+            activebackground=self.colors["bg"],
+            activeforeground=self.colors["fg"],
+            selectcolor=self.colors["bg"],
+            highlightthickness=0,
+            bd=0,
+        ).pack(side="left", padx=(20, 5))
         
         self.port_entry = tk.Entry(row1, textvariable=self.db_port,
                                    bg=self.colors["secondary"], fg="white",
@@ -3811,6 +3898,7 @@ Continue?"""
         self.db_dropdown = ttk.Combobox(db_row, textvariable=self.db_name, 
                                          values=[], width=25, state="normal")
         self.db_dropdown.pack(side="left", padx=(0, 10))
+        self._bind_dark_combobox(self.db_dropdown)
         
         ttk.Button(db_row, text="🔄 Refresh List", command=self.refresh_mysql_databases,
                   style="Secondary.TButton").pack(side="left", padx=5)

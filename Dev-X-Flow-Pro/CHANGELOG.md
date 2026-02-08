@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.1.1] - 2026-02-08
+
+### Fixed
+- **UI Crash**: Fixed `tk.TclError: unknown option "-bg"` caused by using `ttk.Entry` with `bg/fg` options
+- **Dark Mode Consistency**: Darkened `ttk.Combobox` dropdown popups (DB Type, Database list, Diff Viewer, Rebase, Terminal project type, AI provider)
+- **Dark Mode Consistency**: Replaced white `ttk.Checkbutton` indicators with dark `tk.Checkbutton` for key toggles (e.g., Custom Port, Auto-refresh, Enable Suggestions)
+
+---
+
 ## [7.1] - 2026-02-08
 
 ### Added
@@ -270,6 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 | Version | Date | Key Features |
 |---------|------|--------------|
+| 7.1.1 | 2026-02-08 | UI hotfix: dark-mode dropdowns + checkbox styling + -bg crash fix |
 | 7.1 | 2026-02-08 | Multi-Database Support (MySQL, PostgreSQL, SQL Server, SQLite) |
 | 7.0 | 2026-02-08 | Initial Dev-X-Flow-Pro Release with Git + Database Management |
 | 6.2 | 2026-02-07 | Git Author Config, Version Update |
