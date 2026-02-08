@@ -17,6 +17,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.1] - 2026-02-08
+
+### Added
+- **Multi-Database Support**: Extended Database Tab to support 4 database engines
+  - **Adapter Architecture**: Unified `DatabaseAdapter` base class with consistent interface
+    - `test_connection()` - Test database connectivity
+    - `list_databases()` - List available databases
+    - `list_tables(database)` - List tables in selected database
+    - `import_sql_file(sql_file, database)` - Import SQL dumps
+    - `export_schema_to_dir(export_dir, database)` - Export schema + sample data
+  - **MySQL/MariaDB** (via `MySQLCliAdapter`)
+    - MySQL CLI auto-detection (PATH, common paths including XAMPP)
+    - Browse UI for custom mysql.exe path (supports non-C:\ drives)
+    - Full import/export via mysql CLI
+  - **SQLite** (via `SQLiteAdapter`)
+    - Native Python `sqlite3` support (no external dependencies)
+    - File picker for .db files
+    - Semicolon-split SQL import
+  - **PostgreSQL** (via `PostgreSQLAdapter`)
+    - Python driver support (`psycopg` or `psycopg2`)
+    - Clear dependency error if driver not installed
+    - Best-effort semicolon-split SQL import
+    - Schema export with column metadata and sample rows
+  - **SQL Server** (via `SQLServerAdapter`)
+    - Python `pyodbc` driver support
+    - Configurable ODBC driver (default: "ODBC Driver 17 for SQL Server")
+    - Clear dependency error if pyodbc not installed
+    - Best-effort GO-batch split SQL import for T-SQL scripts
+  - **UI Updates**
+    - DB Type dropdown: MySQL/MariaDB, PostgreSQL, SQL Server, SQLite
+    - Dynamic adapter selection based on DB type
+    - Connection frame title updates per database type
+    - `sqlserver_driver` configuration field
+  - **Dependency Detection**
+    - Auto-detection with clear error messages
+    - Browse UI for MySQL client path
+    - Runtime dependency checks for psycopg/pyodbc
+
+### Fixed
+- **SQLiteAdapter**: Removed duplicate `import_sql_file` methods that incorrectly used SQL Server GO-batch logic
+- **SQLServerAdapter**: Added missing `import_sql_file` method
+- **MySQLCliAdapter**: Added missing `import_sql_file` and `export_schema_to_dir` methods
+
+---
+
 ## [7.0] - 2026-02-08
 
 ### Added
@@ -225,6 +270,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 | Version | Date | Key Features |
 |---------|------|--------------|
+| 7.1 | 2026-02-08 | Multi-Database Support (MySQL, PostgreSQL, SQL Server, SQLite) |
+| 7.0 | 2026-02-08 | Initial Dev-X-Flow-Pro Release with Git + Database Management |
 | 6.2 | 2026-02-07 | Git Author Config, Version Update |
 | 6.1.1 | 2026-02-07 | Icon Fix, Windows Explorer Support |
 | 6.1 | 2026-02-06 | AI Commit Messages, Initial Stable Release |

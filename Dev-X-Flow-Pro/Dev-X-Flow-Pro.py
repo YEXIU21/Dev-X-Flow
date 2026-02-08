@@ -8,11 +8,556 @@ import webbrowser
 import re
 import requests
 import sys
+import shutil
+import sqlite3
+
+class DatabaseAdapter:
+    def test_connection(self):
+        raise NotImplementedError()
+
+    def list_databases(self):
+        raise NotImplementedError()
+
+    def list_tables(self, database):
+        raise NotImplementedError()
+
+    def import_sql_file(self, sql_file, database):
+        raise NotImplementedError()
+
+    def export_schema_to_dir(self, export_dir, database):
+        raise NotImplementedError()
+
+
+class MySQLCliAdapter(DatabaseAdapter):
+    def __init__(self, app):
+        self.app = app
+
+    def get_client(self):
+        return self.app._get_mysql_client()
+
+    def build_mysql_args(self, database=None):
+        mysql_client = self.get_client()
+        if not mysql_client:
+            return None
+
+        mysql_args = [mysql_client, "-h", self.app.db_host.get(), "-u", self.app.db_user.get()]
+
+        if self.app.db_use_custom_port.get():
+            port = self.app.db_port.get()
+            if port and port != "3306":
+                mysql_args.extend(["-P", port])
+
+        if self.app.db_password.get():
+            mysql_args.extend(["-p" + self.app.db_password.get()])
+
+        if database:
+            mysql_args.extend(["-D", database])
+
+        return mysql_args
+
+    def run_mysql_command(self, args, database=None, show_error=True, timeout=30):
+        mysql_args = self.build_mysql_args(database=database)
+        if not mysql_args:
+            error_msg = self.app._mysql_not_found_message()
+            if show_error:
+                messagebox.showerror("MySQL Client Missing", error_msg)
+            return f"Error: {error_msg}"
+
+        mysql_args.extend(args)
+
+        kwargs = {"capture_output": True, "text": True, "timeout": timeout}
+        if sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+        try:
+            result = subprocess.run(mysql_args, **kwargs)
+        except FileNotFoundError:
+            error_msg = self.app._mysql_not_found_message()
+            if show_error:
+                messagebox.showerror("MySQL Client Missing", error_msg)
+            return f"Error: {error_msg}"
+
+        if result.returncode != 0:
+            error_msg = f"MySQL Error: {result.stderr}"
+            if show_error:
+                messagebox.showerror("MySQL Error", error_msg)
+            return error_msg
+
+        return result.stdout.strip()
+
+    def import_sql_file(self, sql_file, database):
+        try:
+            if not os.path.exists(sql_file):
+                return "Error: SQL file not found."
+            mysql_args = self.build_mysql_args(database=database)
+            if not mysql_args:
+                return "Error: MySQL client not found."
+            
+            kwargs = {"stdin": open(sql_file, 'r', encoding='utf-8', errors='ignore'), 
+                      "capture_output": True, "text": True, "timeout": 300}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            
+            result = subprocess.run(mysql_args, **kwargs)
+            if result.returncode != 0:
+                return f"Error: {result.stderr}"
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def export_schema_to_dir(self, export_dir, database):
+        try:
+            os.makedirs(export_dir, exist_ok=True)
+            # Get tables
+            result = self.run_mysql_command(["-e", "SHOW TABLES;"], database=database, show_error=False)
+            if result.startswith("Error"):
+                return f"Error: {result}"
+            
+            tables = [line.strip() for line in result.split('\n') if line.strip() and not line.startswith('Tables_in')]
+            exported = 0
+            
+            for table in tables:
+                out_file = os.path.join(export_dir, f"{table}.txt")
+                with open(out_file, 'w', encoding='utf-8') as f:
+                    f.write(f"=== SCHEMA: {table} ===\n\n")
+                    schema = self.run_mysql_command(["-e", f"SHOW CREATE TABLE {table};"], database=database, show_error=False)
+                    f.write(schema + "\n\n")
+                    f.write(f"=== SAMPLE DATA (First 50 rows) ===\n\n")
+                    data = self.run_mysql_command(["-e", f"SELECT * FROM {table} LIMIT 50;"], database=database, show_error=False)
+                    f.write(data + "\n")
+                exported += 1
+            return exported
+        except Exception as e:
+            return f"Error: {e}"
+
+
+class SQLiteAdapter(DatabaseAdapter):
+    def __init__(self, app):
+        self.app = app
+
+    def _get_db_path(self):
+        p = (self.app.sqlite_db_path.get() or "").strip()
+        return p or None
+
+    def test_connection(self):
+        p = self._get_db_path()
+        if not p:
+            return "Error: SQLite database path not set."
+        if not os.path.exists(p):
+            return "Error: SQLite database file not found."
+        try:
+            conn = sqlite3.connect(p, timeout=5)
+            conn.execute("SELECT 1;")
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def import_sql_file(self, sql_file, database=None):
+        p = self._get_db_path()
+        if not p:
+            return "Error: SQLite database path not set."
+        if not os.path.exists(p):
+            return "Error: SQLite database file not found."
+        if not os.path.exists(sql_file):
+            return "Error: SQL file not found."
+        try:
+            with open(sql_file, 'r', encoding='utf-8', errors='ignore') as f:
+                sql_text = f.read()
+
+            statements = [s.strip() for s in sql_text.split(';') if s.strip()]
+            conn = sqlite3.connect(p)
+            cur = conn.cursor()
+            for stmt in statements:
+                cur.execute(stmt)
+            conn.commit()
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def list_databases(self):
+        return ["(sqlite)"]
+
+    def list_tables(self):
+        p = self._get_db_path()
+        if not p:
+            return "Error: SQLite database path not set."
+        try:
+            conn = sqlite3.connect(p)
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
+            rows = cur.fetchall()
+            conn.close()
+            return [r[0] for r in rows]
+        except Exception as e:
+            return f"Error: {e}"
+
+    def export_schema_and_samples(self, export_dir, max_rows=50):
+        p = self._get_db_path()
+        if not p:
+            return "Error: SQLite database path not set."
+        if not os.path.exists(p):
+            return "Error: SQLite database file not found."
+        try:
+            os.makedirs(export_dir, exist_ok=True)
+            conn = sqlite3.connect(p)
+            cur = conn.cursor()
+            cur.execute("SELECT name, sql FROM sqlite_master WHERE type='table' ORDER BY name;")
+            tables = cur.fetchall()
+
+            exported = 0
+            for table_name, create_sql in tables:
+                out_file = os.path.join(export_dir, f"{table_name}.txt")
+                with open(out_file, 'w', encoding='utf-8') as f:
+                    f.write(f"=== SCHEMA: {table_name} ===\n\n")
+                    f.write((create_sql or "") + "\n\n")
+                    f.write(f"=== SAMPLE DATA (First {max_rows} rows) ===\n\n")
+
+                    try:
+                        cur.execute(f"SELECT * FROM {table_name} LIMIT {int(max_rows)};")
+                        cols = [d[0] for d in (cur.description or [])]
+                        if cols:
+                            f.write("\t".join(cols) + "\n")
+                        for row in cur.fetchall():
+                            f.write("\t".join([str(x) for x in row]) + "\n")
+                    except Exception as e:
+                        f.write(f"(Failed to read sample rows: {e})\n")
+
+                exported += 1
+
+            conn.close()
+            return exported
+        except Exception as e:
+            return f"Error: {e}"
+
+    def import_sql_file(self, sql_file, database=None):
+        p = self._get_db_path()
+        if not p:
+            return "Error: SQLite database path not set."
+        if not os.path.exists(p):
+            return "Error: SQLite database file not found."
+        if not os.path.exists(sql_file):
+            return "Error: SQL file not found."
+        try:
+            with open(sql_file, 'r', encoding='utf-8', errors='ignore') as f:
+                sql_text = f.read()
+
+            statements = [s.strip() for s in sql_text.split(';') if s.strip()]
+            conn = sqlite3.connect(p)
+            cur = conn.cursor()
+            for stmt in statements:
+                cur.execute(stmt)
+            conn.commit()
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def export_schema_to_dir(self, export_dir, database):
+        return self.export_schema_and_samples(export_dir)
+
+
+class PostgreSQLAdapter(DatabaseAdapter):
+    def __init__(self, app):
+        self.app = app
+
+    def _get_connector(self):
+        try:
+            import psycopg  # type: ignore
+            return ("psycopg", psycopg)
+        except Exception:
+            pass
+        try:
+            import psycopg2  # type: ignore
+            return ("psycopg2", psycopg2)
+        except Exception:
+            return (None, None)
+
+    def _connect(self, database=None, timeout=5):
+        name, mod = self._get_connector()
+        if not mod:
+            raise RuntimeError("Missing dependency: install psycopg or psycopg2")
+
+        dbname = database or (self.app.db_name.get() or "postgres")
+        host = self.app.db_host.get() or "127.0.0.1"
+        user = self.app.db_user.get() or "postgres"
+        password = self.app.db_password.get() or ""
+        port = int(self.app.db_port.get() or "5432")
+
+        # psycopg(3) and psycopg2 both accept these keyword args
+        conn = mod.connect(
+            dbname=dbname,
+            host=host,
+            user=user,
+            password=password,
+            port=port,
+            connect_timeout=timeout,
+        )
+        return conn
+
+    def test_connection(self):
+        try:
+            conn = self._connect(timeout=5)
+            cur = conn.cursor()
+            cur.execute("SELECT version();")
+            ver = cur.fetchone()
+            conn.close()
+            return ("OK", ver[0] if ver else "OK")
+        except Exception as e:
+            return ("Error", str(e))
+
+    def list_databases(self):
+        try:
+            conn = self._connect(database="postgres", timeout=5)
+            cur = conn.cursor()
+            cur.execute("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;")
+            rows = cur.fetchall()
+            conn.close()
+            return [r[0] for r in rows]
+        except Exception as e:
+            return f"Error: {e}"
+
+    def list_tables(self, database):
+        try:
+            conn = self._connect(database=database, timeout=5)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT table_schema, table_name FROM information_schema.tables "
+                "WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') "
+                "ORDER BY table_schema, table_name;"
+            )
+            rows = cur.fetchall()
+            conn.close()
+            return [f"{r[0]}.{r[1]}" for r in rows]
+        except Exception as e:
+            return f"Error: {e}"
+
+    def import_sql_file(self, sql_file, database):
+        try:
+            if not os.path.exists(sql_file):
+                return "Error: SQL file not found."
+
+            conn = self._connect(database=database, timeout=10)
+            cur = conn.cursor()
+
+            with open(sql_file, 'r', encoding='utf-8', errors='ignore') as f:
+                sql_text = f.read()
+
+            # Best-effort: split by ';' (may fail for functions/DO blocks)
+            statements = [s.strip() for s in sql_text.split(';') if s.strip()]
+            for stmt in statements:
+                cur.execute(stmt)
+
+            conn.commit()
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def export_schema_to_dir(self, export_dir, database):
+        try:
+            os.makedirs(export_dir, exist_ok=True)
+            conn = self._connect(database=database, timeout=10)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT table_schema, table_name FROM information_schema.tables "
+                "WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') "
+                "ORDER BY table_schema, table_name;"
+            )
+            tables = cur.fetchall()
+            exported = 0
+
+            for schema, table in tables:
+                safe_name = f"{schema}.{table}".replace('/', '_')
+                out_file = os.path.join(export_dir, f"{safe_name}.txt")
+                with open(out_file, 'w', encoding='utf-8') as f:
+                    f.write(f"=== TABLE: {schema}.{table} ===\n\n")
+                    cur.execute(
+                        "SELECT column_name, data_type, is_nullable "
+                        "FROM information_schema.columns "
+                        "WHERE table_schema=%s AND table_name=%s "
+                        "ORDER BY ordinal_position;",
+                        (schema, table),
+                    )
+                    cols = cur.fetchall()
+                    f.write("Columns:\n")
+                    for c in cols:
+                        f.write(f"- {c[0]} {c[1]} NULLABLE={c[2]}\n")
+
+                    f.write("\nSample rows (first 50):\n")
+                    try:
+                        cur.execute(f'SELECT * FROM "{schema}"."{table}" LIMIT 50;')
+                        rows = cur.fetchall()
+                        colnames = [d[0] for d in (cur.description or [])]
+                        if colnames:
+                            f.write("\t".join(colnames) + "\n")
+                        for r in rows:
+                            f.write("\t".join([str(x) for x in r]) + "\n")
+                    except Exception as e:
+                        f.write(f"(Failed to read sample rows: {e})\n")
+
+                exported += 1
+
+            conn.close()
+            return exported
+        except Exception as e:
+            return f"Error: {e}"
+
+
+class SQLServerAdapter(DatabaseAdapter):
+    def __init__(self, app):
+        self.app = app
+
+    def _get_pyodbc(self):
+        try:
+            import pyodbc  # type: ignore
+            return pyodbc
+        except Exception:
+            return None
+
+    def _connect(self, database=None, timeout=5):
+        pyodbc = self._get_pyodbc()
+        if not pyodbc:
+            raise RuntimeError("Missing dependency: install pyodbc + Microsoft ODBC Driver for SQL Server")
+
+        host = self.app.db_host.get() or "127.0.0.1"
+        port = (self.app.db_port.get() or "").strip()
+        server = host if not port else f"{host},{port}"
+
+        user = self.app.db_user.get() or "sa"
+        password = self.app.db_password.get() or ""
+        dbname = database or (self.app.db_name.get() or "master")
+        driver = (self.app.sqlserver_driver.get() or "ODBC Driver 17 for SQL Server").strip()
+
+        conn_str = (
+            f"DRIVER={{{driver}}};"
+            f"SERVER={server};"
+            f"DATABASE={dbname};"
+            f"UID={user};"
+            f"PWD={password};"
+            "TrustServerCertificate=yes;"
+        )
+        return pyodbc.connect(conn_str, timeout=timeout)
+
+    def test_connection(self):
+        try:
+            conn = self._connect(timeout=5)
+            cur = conn.cursor()
+            cur.execute("SELECT @@VERSION;")
+            ver = cur.fetchone()
+            conn.close()
+            return ("OK", ver[0] if ver else "OK")
+        except Exception as e:
+            return ("Error", str(e))
+
+    def list_databases(self):
+        try:
+            conn = self._connect(database="master", timeout=5)
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sys.databases ORDER BY name;")
+            rows = cur.fetchall()
+            conn.close()
+            return [r[0] for r in rows]
+        except Exception as e:
+            return f"Error: {e}"
+
+    def list_tables(self, database):
+        try:
+            conn = self._connect(database=database, timeout=5)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                "WHERE TABLE_TYPE='BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME;"
+            )
+            rows = cur.fetchall()
+            conn.close()
+            return [f"{r[0]}.{r[1]}" for r in rows]
+        except Exception as e:
+            return f"Error: {e}"
+
+    def export_schema_to_dir(self, export_dir, database):
+        try:
+            os.makedirs(export_dir, exist_ok=True)
+            conn = self._connect(database=database, timeout=10)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                "WHERE TABLE_TYPE='BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME;"
+            )
+            tables = cur.fetchall()
+            exported = 0
+
+            for schema, table in tables:
+                safe_name = f"{schema}.{table}".replace('/', '_')
+                out_file = os.path.join(export_dir, f"{safe_name}.txt")
+                with open(out_file, 'w', encoding='utf-8') as f:
+                    f.write(f"=== TABLE: {schema}.{table} ===\n\n")
+                    cur.execute(
+                        "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE "
+                        "FROM INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE TABLE_SCHEMA=? AND TABLE_NAME=? ORDER BY ORDINAL_POSITION;",
+                        (schema, table),
+                    )
+                    cols = cur.fetchall()
+                    f.write("Columns:\n")
+                    for c in cols:
+                        f.write(f"- {c[0]} {c[1]} NULLABLE={c[2]}\n")
+
+                    f.write("\nSample rows (first 50):\n")
+                    try:
+                        cur.execute(f"SELECT TOP 50 * FROM [{schema}].[{table}];")
+                        rows = cur.fetchall()
+                        colnames = [d[0] for d in (cur.description or [])]
+                        if colnames:
+                            f.write("\t".join(colnames) + "\n")
+                        for r in rows:
+                            f.write("\t".join([str(x) for x in r]) + "\n")
+                    except Exception as e:
+                        f.write(f"(Failed to read sample rows: {e})\n")
+
+                exported += 1
+
+            conn.close()
+            return exported
+        except Exception as e:
+            return f"Error: {e}"
+
+    def import_sql_file(self, sql_file, database):
+        try:
+            if not os.path.exists(sql_file):
+                return "Error: SQL file not found."
+
+            with open(sql_file, 'r', encoding='utf-8', errors='ignore') as f:
+                sql_text = f.read()
+
+            batches = [
+                b.strip() for b in re.split(r'^\s*GO\s*$', sql_text, flags=re.IGNORECASE | re.MULTILINE)
+                if b.strip()
+            ]
+
+            conn = self._connect(database=database, timeout=10)
+            cur = conn.cursor()
+
+            for batch in batches:
+                cur.execute(batch)
+                try:
+                    while cur.nextset():
+                        pass
+                except Exception:
+                    pass
+
+            conn.commit()
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
 
 class GitGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Dev-X-Flow-Pro v7.0")
+        self.root.title("Dev-X-Flow-Pro v7.1")
         
         # Set window icon - handle both script and bundled exe modes
         try:
@@ -72,6 +617,7 @@ class GitGUI:
         self.load_ai_config()
         
         # Database Configuration
+        self.db_type = tk.StringVar(value="MySQL/MariaDB")
         self.db_host = tk.StringVar(value="127.0.0.1")
         self.db_port = tk.StringVar(value="3306")
         self.db_use_custom_port = tk.BooleanVar(value=False)
@@ -79,9 +625,19 @@ class GitGUI:
         self.db_password = tk.StringVar(value="")
         self.db_name = tk.StringVar(value="")
         self.sql_file_path = tk.StringVar(value="")
+        self.sqlite_db_path = tk.StringVar(value="")
+        self.sqlserver_driver = tk.StringVar(value="ODBC Driver 17 for SQL Server")
         self.db_config_file = os.path.join(os.path.expanduser("~"), ".gitflow_db_config.json")
         self.load_db_config()
-        
+
+        # MySQL client executable (auto-detected)
+        self.mysql_exe = self._get_saved_mysql_exe() or self._detect_mysql_executable()
+
+        self.db_adapter = None
+        self.set_db_adapter()
+
+        self.db_type.trace_add('write', lambda *_: self.set_db_adapter())
+
         # AI Provider configurations
         self.ai_providers = {
             "openai": {
@@ -266,6 +822,86 @@ class GitGUI:
         self.check_git_repo()
         self.detect_project_type()
 
+    def _ensure_mysql_db_selected(self):
+        if self.db_type.get() != "MySQL/MariaDB":
+            messagebox.showwarning(
+                "Not Implemented",
+                "Selected database type is not implemented yet.\n\n"
+                "Current supported: MySQL/MariaDB (including XAMPP).",
+            )
+            return False
+        return True
+
+    def set_db_adapter(self):
+        t = self.db_type.get()
+        if t == "MySQL/MariaDB":
+            self.db_adapter = MySQLCliAdapter(self)
+        elif t == "SQLite":
+            self.db_adapter = SQLiteAdapter(self)
+        elif t == "PostgreSQL":
+            self.db_adapter = PostgreSQLAdapter(self)
+        elif t == "SQL Server":
+            self.db_adapter = SQLServerAdapter(self)
+        else:
+            self.db_adapter = None
+
+        if hasattr(self, 'conn_frame_title_label'):
+            if t == "MySQL/MariaDB":
+                self.conn_frame_title_label.config(text="  MySQL Connection  ")
+            elif t == "SQLite":
+                self.conn_frame_title_label.config(text="  SQLite Connection  ")
+            else:
+                self.conn_frame_title_label.config(text="  DB Connection  ")
+
+    def _detect_mysql_executable(self):
+        """Return path to mysql client executable or None if not found."""
+        mysql_path = shutil.which("mysql")
+        if mysql_path:
+            return mysql_path
+
+        candidates = [
+            r"C:\\xampp\\mysql\\bin\\mysql.exe",
+            r"C:\\XAMPP\\mysql\\bin\\mysql.exe",
+            r"C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe",
+            r"C:\\Program Files\\MySQL\\MySQL Server 5.7\\bin\\mysql.exe",
+            r"C:\\Program Files (x86)\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe",
+            r"C:\\Program Files (x86)\\MySQL\\MySQL Server 5.7\\bin\\mysql.exe",
+        ]
+
+        for p in candidates:
+            if os.path.exists(p):
+                return p
+
+        return None
+
+    def _get_saved_mysql_exe(self):
+        """Return user-saved mysql.exe path from config if present and valid."""
+        try:
+            if os.path.exists(self.db_config_file):
+                with open(self.db_config_file, 'r') as f:
+                    config = json.load(f)
+                saved = config.get('mysql_exe')
+                if saved and os.path.exists(saved):
+                    return saved
+        except Exception:
+            pass
+        return None
+
+    def _get_mysql_client(self):
+        """Get mysql client executable path, re-detecting if needed."""
+        if self.mysql_exe and os.path.exists(self.mysql_exe):
+            return self.mysql_exe
+        self.mysql_exe = self._detect_mysql_executable()
+        return self.mysql_exe
+
+    def _mysql_not_found_message(self):
+        return (
+            "MySQL client executable not found.\n\n"
+            "Install MySQL client or XAMPP and ensure mysql.exe is in PATH, or located at:\n"
+            "- C:\\xampp\\mysql\\bin\\mysql.exe\n\n"
+            "Then restart Dev-X-Flow-Pro."
+        )
+
     def _get_resource_path(self, relative_path):
         """Get absolute path to resource, works for both dev and PyInstaller"""
         try:
@@ -326,7 +962,7 @@ class GitGUI:
             label.pack(expand=True)
         
         # Version text
-        version_label = tk.Label(splash, text="v7.0", font=("Segoe UI", 12), 
+        version_label = tk.Label(splash, text="v7.1", font=("Segoe UI", 12), 
                                   bg="#1e1e1e", fg="#888888")
         version_label.pack()
         
@@ -2935,11 +3571,14 @@ Continue?"""
             if os.path.exists(self.db_config_file):
                 with open(self.db_config_file, 'r') as f:
                     config = json.load(f)
+                    self.db_type.set(config.get('db_type', 'MySQL/MariaDB'))
                     self.db_host.set(config.get('host', '127.0.0.1'))
                     self.db_port.set(config.get('port', '3306'))
                     self.db_use_custom_port.set(config.get('use_custom_port', False))
                     self.db_user.set(config.get('user', 'root'))
                     self.db_password.set(config.get('password', ''))
+                    self.sqlite_db_path.set(config.get('sqlite_db_path', ''))
+                    self.sqlserver_driver.set(config.get('sqlserver_driver', 'ODBC Driver 17 for SQL Server'))
         except:
             pass
     
@@ -2947,11 +3586,15 @@ Continue?"""
         """Save database configuration to file"""
         try:
             config = {
+                'db_type': self.db_type.get(),
                 'host': self.db_host.get(),
                 'port': self.db_port.get(),
                 'use_custom_port': self.db_use_custom_port.get(),
                 'user': self.db_user.get(),
-                'password': self.db_password.get()
+                'password': self.db_password.get(),
+                'mysql_exe': self.mysql_exe,
+                'sqlite_db_path': self.sqlite_db_path.get(),
+                'sqlserver_driver': self.sqlserver_driver.get()
             }
             with open(self.db_config_file, 'w') as f:
                 json.dump(config, f)
@@ -2959,17 +3602,79 @@ Continue?"""
         except Exception as e:
             self.append_db_output(f"Failed to save config: {e}", "error")
 
+    def browse_mysql_exe(self):
+        file_path = filedialog.askopenfilename(
+            title="Select mysql.exe",
+            filetypes=[("MySQL Client", "mysql.exe"), ("Executable", "*.exe"), ("All Files", "*.*")]
+        )
+        if file_path:
+            self.mysql_exe = file_path
+            if hasattr(self, 'mysql_exe_label'):
+                self.mysql_exe_label.config(text=file_path)
+            self.append_db_output(f"✓ mysql.exe set to: {file_path}", "success")
+
+    def browse_sqlite_db(self):
+        file_path = filedialog.askopenfilename(
+            title="Select SQLite database (.db)",
+            filetypes=[("SQLite Database", "*.db"), ("SQLite", "*.sqlite"), ("All Files", "*.*")]
+        )
+        if file_path:
+            self.sqlite_db_path.set(file_path)
+            if hasattr(self, 'sqlite_db_label'):
+                self.sqlite_db_label.config(text=file_path)
+            self.append_db_output(f"✓ SQLite DB set to: {file_path}", "success")
+
     def test_mysql_connection(self):
         """Test MySQL connection with current settings"""
+        if self.db_type.get() == "SQLite":
+            result = self.db_adapter.test_connection() if self.db_adapter else "Error: SQLite adapter not ready"
+            if result == "OK":
+                self.append_db_output("✅ Connection successful!", "success")
+                self.db_status_label.config(text="● Connection: OK", fg=self.colors["success"])
+            else:
+                self.append_db_output(f"❌ Connection failed: {result}", "error")
+                self.db_status_label.config(text="● Connection: Failed", fg=self.colors["danger"])
+            return
+
+        if self.db_type.get() == "PostgreSQL":
+            status, detail = self.db_adapter.test_connection() if self.db_adapter else ("Error", "PostgreSQL adapter not ready")
+            if status == "OK":
+                self.append_db_output("✅ Connection successful!", "success")
+                self.append_db_output(f"   {detail}", "info")
+                self.db_status_label.config(text="● Connection: OK", fg=self.colors["success"])
+            else:
+                self.append_db_output(f"❌ Connection failed: {detail}", "error")
+                self.db_status_label.config(text="● Connection: Failed", fg=self.colors["danger"])
+            return
+
+        if self.db_type.get() == "SQL Server":
+            status, detail = self.db_adapter.test_connection() if self.db_adapter else ("Error", "SQL Server adapter not ready")
+            if status == "OK":
+                self.append_db_output("✅ Connection successful!", "success")
+                self.append_db_output(f"   {detail}", "info")
+                self.db_status_label.config(text="● Connection: OK", fg=self.colors["success"])
+            else:
+                self.append_db_output(f"❌ Connection failed: {detail}", "error")
+                self.db_status_label.config(text="● Connection: Failed", fg=self.colors["danger"])
+            return
+
+        if not self._ensure_mysql_db_selected():
+            return
         def do_test():
             self.append_db_output("\n🔗 Testing MySQL connection...", "info")
+
+            mysql_client = self._get_mysql_client()
+            if not mysql_client:
+                self.append_db_output(f"❌ {self._mysql_not_found_message()}", "error")
+                self.db_status_label.config(text="● Connection: MySQL client missing", fg=self.colors["danger"])
+                return
             
             # Build connection info string
             port_str = f":{self.db_port.get()}" if self.db_use_custom_port.get() else ""
             conn_info = f"{self.db_user.get()}@{self.db_host.get()}{port_str}"
             
             # Test with timeout
-            mysql_args = ["mysql", "-h", self.db_host.get(), "-u", self.db_user.get()]
+            mysql_args = [mysql_client, "-h", self.db_host.get(), "-u", self.db_user.get()]
             
             if self.db_use_custom_port.get():
                 port = self.db_port.get()
@@ -3000,6 +3705,9 @@ Continue?"""
                     self.append_db_output(f"❌ Connection failed: {error}", "error")
                     self.db_status_label.config(text="● Connection: Failed", fg=self.colors["danger"])
                     
+            except FileNotFoundError:
+                self.append_db_output(f"❌ {self._mysql_not_found_message()}", "error")
+                self.db_status_label.config(text="● Connection: MySQL client missing", fg=self.colors["danger"])
             except subprocess.TimeoutExpired:
                 self.append_db_output("⏱️ Connection timeout (10s) - Server not responding", "error")
                 self.db_status_label.config(text="● Connection: Timeout", fg=self.colors["warning"])
@@ -3017,10 +3725,21 @@ Continue?"""
         # Connection Configuration Frame
         conn_frame = ttk.LabelFrame(tab, text="  MySQL Connection  ")
         conn_frame.pack(fill="x", pady=(0, 10))
+
+        self.conn_frame_title_label = conn_frame
         
         # Host and User row
         row1 = ttk.Frame(conn_frame, padding=10)
         row1.pack(fill="x")
+
+        ttk.Label(row1, text="DB Type:").pack(side="left", padx=(0, 5))
+        ttk.Combobox(
+            row1,
+            textvariable=self.db_type,
+            values=["MySQL/MariaDB", "PostgreSQL", "SQL Server", "SQLite"],
+            width=14,
+            state="readonly",
+        ).pack(side="left", padx=(0, 15))
         
         ttk.Label(row1, text="Host:").pack(side="left", padx=(0, 5))
         host_entry = tk.Entry(row1, textvariable=self.db_host, 
@@ -3054,6 +3773,30 @@ Continue?"""
                   style="Secondary.TButton").pack(side="right", padx=5)
         ttk.Button(row1, text="🔗 Test Connection", command=self.test_mysql_connection,
                   style="Success.TButton").pack(side="right", padx=5)
+
+        row2 = ttk.Frame(conn_frame, padding=(10, 0, 10, 10))
+        row2.pack(fill="x")
+
+        ttk.Label(row2, text="mysql.exe:").pack(side="left", padx=(0, 5))
+        self.mysql_exe_label = ttk.Label(row2, text=self.mysql_exe or "(auto-detect)")
+        self.mysql_exe_label.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        ttk.Button(row2, text="📂 Browse mysql.exe", command=self.browse_mysql_exe,
+                  style="Secondary.TButton").pack(side="right")
+
+        sqlite_row = ttk.Frame(conn_frame, padding=(10, 0, 10, 10))
+        sqlite_row.pack(fill="x")
+        ttk.Label(sqlite_row, text="SQLite .db:").pack(side="left", padx=(0, 5))
+        self.sqlite_db_label = ttk.Label(sqlite_row, text=self.sqlite_db_path.get() or "(not set)")
+        self.sqlite_db_label.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        ttk.Button(sqlite_row, text="📂 Browse SQLite DB", command=self.browse_sqlite_db,
+                  style="Secondary.TButton").pack(side="right")
+
+        sqlsrv_row = ttk.Frame(conn_frame, padding=(10, 0, 10, 10))
+        sqlsrv_row.pack(fill="x")
+        ttk.Label(sqlsrv_row, text="SQL Server Driver:").pack(side="left", padx=(0, 5))
+        tk.Entry(sqlsrv_row, textvariable=self.sqlserver_driver,
+                 bg=self.colors["secondary"], fg="white",
+                 insertbackground="white", relief="flat").pack(side="left", fill="x", expand=True, padx=(0, 10))
         
         # Database Selection Frame
         db_frame = ttk.LabelFrame(tab, text="  Target Database  ")
@@ -3151,52 +3894,46 @@ Continue?"""
     def run_mysql_command(self, args, database=None, show_error=True, timeout=30):
         """Execute a MySQL command with timeout"""
         try:
-            mysql_args = ["mysql", "-h", self.db_host.get(), "-u", self.db_user.get()]
-            
-            # Add custom port if enabled
-            if self.db_use_custom_port.get():
-                port = self.db_port.get()
-                if port and port != "3306":
-                    mysql_args.extend(["-P", port])
-            
-            # Add password if provided
-            if self.db_password.get():
-                mysql_args.extend(["-p" + self.db_password.get()])
-            
-            # Add database if specified
-            if database:
-                mysql_args.extend(["-D", database])
-            
-            # Add additional arguments
-            mysql_args.extend(args)
-            
-            kwargs = {'capture_output': True, 'text': True, 'timeout': timeout}
-            if sys.platform == 'win32':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-            
-            result = subprocess.run(mysql_args, **kwargs)
-            
-            if result.returncode != 0:
-                error_msg = f"MySQL Error: {result.stderr}"
-                if show_error:
-                    messagebox.showerror("MySQL Error", error_msg)
-                return error_msg
-            
-            return result.stdout.strip()
-            
+            return self.db_adapter.run_mysql_command(args, database=database, show_error=show_error, timeout=timeout)
         except subprocess.TimeoutExpired:
             error_msg = f"MySQL timeout after {timeout}s - connection may be slow or server unreachable"
             if show_error:
                 messagebox.showerror("Connection Timeout", error_msg)
             return f"Error: {error_msg}"
         except Exception as e:
-            error_msg = f"Error: {str(e)}"
+            error_msg = f"MySQL execution error: {str(e)}"
             if show_error:
                 messagebox.showerror("Error", error_msg)
             return error_msg
     
     def refresh_mysql_databases(self):
         """Fetch list of MySQL databases"""
+        if self.db_type.get() == "SQLite":
+            dbs = self.db_adapter.list_databases() if self.db_adapter else ["(sqlite)"]
+            self.db_dropdown['values'] = dbs
+            self.db_name.set(dbs[0] if dbs else "(sqlite)")
+            self.append_db_output("Using SQLite database file.", "info")
+            self.db_status_label.config(text="● SQLite Ready", fg=self.colors["success"])
+            return
+
+        if self.db_type.get() in ("PostgreSQL", "SQL Server"):
+            if not self.db_adapter:
+                self.append_db_output("Error: DB adapter not ready", "error")
+                return
+            dbs = self.db_adapter.list_databases()
+            if isinstance(dbs, str) and dbs.startswith("Error"):
+                self.append_db_output(dbs, "error")
+                self.db_status_label.config(text="● Connection Error", fg=self.colors["danger"])
+                return
+            self.db_dropdown['values'] = dbs
+            if dbs:
+                self.db_name.set(dbs[0])
+            self.append_db_output(f"Found {len(dbs)} databases", "success")
+            self.db_status_label.config(text=f"● {len(dbs)} Databases Available", fg=self.colors["success"])
+            return
+
+        if not self._ensure_mysql_db_selected():
+            return
         def do_refresh():
             self.db_status_label.config(text="● Loading databases...", fg=self.colors["warning"])
             self.root.update()
@@ -3226,6 +3963,34 @@ Continue?"""
     
     def view_database_status(self):
         """View tables and sizes in selected database"""
+        if self.db_type.get() == "SQLite":
+            tables = self.db_adapter.list_tables() if self.db_adapter else "Error: SQLite adapter not ready"
+            if isinstance(tables, str) and tables.startswith("Error"):
+                self.append_db_output(tables, "error")
+                return
+            self.append_db_output(f"\n📊 SQLite tables ({len(tables)} total):\n", "info")
+            for t in (tables or [])[:50]:
+                self.append_db_output(f"  • {t}", "info")
+            return
+
+        if self.db_type.get() in ("PostgreSQL", "SQL Server"):
+            if not self.db_adapter:
+                self.append_db_output("Error: DB adapter not ready", "error")
+                return
+            db_name = self.db_name.get() or ("postgres" if self.db_type.get() == "PostgreSQL" else "master")
+            tables = self.db_adapter.list_tables(db_name)
+            if isinstance(tables, str) and tables.startswith("Error"):
+                self.append_db_output(tables, "error")
+                return
+            self.append_db_output(f"\n📊 Tables in {db_name} ({len(tables)} total):\n", "info")
+            for t in (tables or [])[:50]:
+                self.append_db_output(f"  • {t}", "info")
+            if len(tables) > 50:
+                self.append_db_output(f"  ... and {len(tables) - 50} more", "warning")
+            return
+
+        if not self._ensure_mysql_db_selected():
+            return
         db_name = self.db_name.get()
         if not db_name:
             messagebox.showwarning("Warning", "Please select a database first.")
@@ -3265,6 +4030,30 @@ Continue?"""
     
     def export_database_to_txt(self):
         """Export database schema and sample data to text files"""
+        if self.db_type.get() == "SQLite":
+            export_dir = os.path.join(self.repo_dir, "db_exports_sqlite")
+            result = self.db_adapter.export_schema_and_samples(export_dir) if self.db_adapter else "Error: SQLite adapter not ready"
+            if isinstance(result, str) and result.startswith("Error"):
+                self.append_db_output(result, "error")
+                return
+            self.append_db_output(f"\n✅ Export complete! {result} tables exported to:\n{export_dir}", "success")
+            return
+
+        if self.db_type.get() in ("PostgreSQL", "SQL Server"):
+            db_name = self.db_name.get() or ("postgres" if self.db_type.get() == "PostgreSQL" else "master")
+            export_dir = os.path.join(self.repo_dir, f"db_exports_{self.db_type.get().replace(' ', '_').lower()}_{db_name}")
+            if not self.db_adapter:
+                self.append_db_output("Error: DB adapter not ready", "error")
+                return
+            result = self.db_adapter.export_schema_to_dir(export_dir, db_name)
+            if isinstance(result, str) and result.startswith("Error"):
+                self.append_db_output(result, "error")
+                return
+            self.append_db_output(f"\n✅ Export complete! {result} tables exported to:\n{export_dir}", "success")
+            return
+
+        if not self._ensure_mysql_db_selected():
+            return
         db_name = self.db_name.get()
         if not db_name:
             messagebox.showwarning("Warning", "Please select a database first.")
@@ -3327,6 +4116,8 @@ Continue?"""
     
     def selective_restore_table(self):
         """Restore a specific table from SQL file"""
+        if not self._ensure_mysql_db_selected():
+            return
         sql_file = self.sql_file_path.get()
         db_name = self.db_name.get()
         
@@ -3386,6 +4177,35 @@ Continue?"""
     
     def full_database_import(self):
         """Import entire SQL file to database"""
+        if self.db_type.get() in ("PostgreSQL", "SQL Server"):
+            sql_file = self.sql_file_path.get()
+            db_name = self.db_name.get()
+            if not sql_file:
+                messagebox.showwarning("Warning", "Please select an SQL file first.")
+                return
+            if not os.path.exists(sql_file):
+                messagebox.showerror("Error", "SQL file not found.")
+                return
+            if not db_name:
+                messagebox.showwarning("Warning", "Please select a target database first.")
+                return
+            if not self.db_adapter:
+                self.append_db_output("Error: DB adapter not ready", "error")
+                return
+            confirm = messagebox.askyesno(
+                "Confirm Import",
+                f"This will execute SQL statements into '{db_name}'.\n\nContinue?",
+            )
+            if not confirm:
+                return
+            self.append_db_output(f"\n🚀 Importing SQL into {db_name}...", "info")
+            result = self.db_adapter.import_sql_file(sql_file, db_name)
+            if result == "OK":
+                self.append_db_output("✅ Import completed successfully!", "success")
+            else:
+                self.append_db_output(f"❌ Import failed: {result}", "error")
+            return
+
         sql_file = self.sql_file_path.get()
         db_name = self.db_name.get()
         
@@ -3446,8 +4266,13 @@ Continue?"""
                 self.run_mysql_command(["-e", f"DROP DATABASE {db_name};"], show_error=False)
                 self.run_mysql_command(["-e", f"CREATE DATABASE {db_name};"], show_error=False)
             
+            mysql_client = self._get_mysql_client()
+            if not mysql_client:
+                self.append_db_output(f"❌ {self._mysql_not_found_message()}", "error")
+                return
+
             # Execute SQL file with progress monitoring
-            mysql_args = ["mysql", "-h", self.db_host.get(), "-u", self.db_user.get()]
+            mysql_args = [mysql_client, "-h", self.db_host.get(), "-u", self.db_user.get()]
             
             # Add custom port if enabled
             if self.db_use_custom_port.get():
