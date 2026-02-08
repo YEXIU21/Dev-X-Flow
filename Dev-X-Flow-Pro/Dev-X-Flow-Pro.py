@@ -27,10 +27,25 @@ class DatabaseAdapter:
     def export_schema_to_dir(self, export_dir, database):
         raise NotImplementedError()
 
+    def run_sql(self, sql_text, database=None, timeout=30):
+        raise NotImplementedError()
+
+    def create_database(self, name):
+        raise NotImplementedError()
+
+    def drop_database(self, name):
+        raise NotImplementedError()
+
 
 class MySQLCliAdapter(DatabaseAdapter):
     def __init__(self, app):
         self.app = app
+
+    def _quote_ident(self, name):
+        n = (name or "").strip()
+        if not n:
+            return "``"
+        return "`" + n.replace("`", "``") + "`"
 
     def get_client(self):
         return self.app._get_mysql_client()
@@ -130,6 +145,30 @@ class MySQLCliAdapter(DatabaseAdapter):
         except Exception as e:
             return f"Error: {e}"
 
+    def run_sql(self, sql_text, database=None, timeout=30):
+        try:
+            if not (sql_text or "").strip():
+                return "Error: SQL is empty."
+            args = ["-e", sql_text]
+            result = self.run_mysql_command(args, database=database, show_error=False, timeout=timeout)
+            if isinstance(result, str) and result.startswith("Error"):
+                return result
+            return result or "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def create_database(self, name):
+        n = (name or "").strip()
+        if not n:
+            return "Error: Database name is required."
+        return self.run_sql(f"CREATE DATABASE {self._quote_ident(n)};", database=None, timeout=30)
+
+    def drop_database(self, name):
+        n = (name or "").strip()
+        if not n:
+            return "Error: Database name is required."
+        return self.run_sql(f"DROP DATABASE {self._quote_ident(n)};", database=None, timeout=30)
+
 
 class SQLiteAdapter(DatabaseAdapter):
     def __init__(self, app):
@@ -153,6 +192,29 @@ class SQLiteAdapter(DatabaseAdapter):
         except Exception as e:
             return f"Error: {e}"
 
+    def run_sql(self, sql_text, database=None, timeout=30):
+        p = self._get_db_path()
+        if not p:
+            return "Error: SQLite database path not set."
+        if not os.path.exists(p):
+            return "Error: SQLite database file not found."
+        if not (sql_text or "").strip():
+            return "Error: SQL is empty."
+        try:
+            conn = sqlite3.connect(p, timeout=max(1, int(timeout)))
+            conn.executescript(sql_text)
+            conn.commit()
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def create_database(self, name):
+        return "Error: SQLite does not support CREATE DATABASE. Create/select a .db file instead."
+
+    def drop_database(self, name):
+        return "Error: SQLite does not support DROP DATABASE. Delete the .db file instead."
+
     def import_sql_file(self, sql_file, database=None):
         p = self._get_db_path()
         if not p:
@@ -164,15 +226,7 @@ class SQLiteAdapter(DatabaseAdapter):
         try:
             with open(sql_file, 'r', encoding='utf-8', errors='ignore') as f:
                 sql_text = f.read()
-
-            statements = [s.strip() for s in sql_text.split(';') if s.strip()]
-            conn = sqlite3.connect(p)
-            cur = conn.cursor()
-            for stmt in statements:
-                cur.execute(stmt)
-            conn.commit()
-            conn.close()
-            return "OK"
+            return self.run_sql(sql_text)
         except Exception as e:
             return f"Error: {e}"
 
@@ -183,8 +237,10 @@ class SQLiteAdapter(DatabaseAdapter):
         p = self._get_db_path()
         if not p:
             return "Error: SQLite database path not set."
+        if not os.path.exists(p):
+            return "Error: SQLite database file not found."
         try:
-            conn = sqlite3.connect(p)
+            conn = sqlite3.connect(p, timeout=5)
             cur = conn.cursor()
             cur.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
             rows = cur.fetchall()
@@ -228,29 +284,6 @@ class SQLiteAdapter(DatabaseAdapter):
 
             conn.close()
             return exported
-        except Exception as e:
-            return f"Error: {e}"
-
-    def import_sql_file(self, sql_file, database=None):
-        p = self._get_db_path()
-        if not p:
-            return "Error: SQLite database path not set."
-        if not os.path.exists(p):
-            return "Error: SQLite database file not found."
-        if not os.path.exists(sql_file):
-            return "Error: SQL file not found."
-        try:
-            with open(sql_file, 'r', encoding='utf-8', errors='ignore') as f:
-                sql_text = f.read()
-
-            statements = [s.strip() for s in sql_text.split(';') if s.strip()]
-            conn = sqlite3.connect(p)
-            cur = conn.cursor()
-            for stmt in statements:
-                cur.execute(stmt)
-            conn.commit()
-            conn.close()
-            return "OK"
         except Exception as e:
             return f"Error: {e}"
 
@@ -404,6 +437,66 @@ class PostgreSQLAdapter(DatabaseAdapter):
         except Exception as e:
             return f"Error: {e}"
 
+    def run_sql(self, sql_text, database=None, timeout=30):
+        try:
+            if not (sql_text or "").strip():
+                return "Error: SQL is empty."
+
+            conn = self._connect(database=database, timeout=max(1, int(timeout)))
+            cur = conn.cursor()
+
+            statements = [s.strip() for s in sql_text.split(';') if s.strip()]
+            for stmt in statements:
+                cur.execute(stmt)
+
+            conn.commit()
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def create_database(self, name):
+        n = (name or "").strip()
+        if not n:
+            return "Error: Database name is required."
+        try:
+            conn = self._connect(database="postgres", timeout=10)
+            try:
+                conn.autocommit = True
+            except Exception:
+                try:
+                    conn.set_isolation_level(0)
+                except Exception:
+                    pass
+            cur = conn.cursor()
+            safe = n.replace('"', '""')
+            cur.execute(f'CREATE DATABASE "{safe}";')
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def drop_database(self, name):
+        n = (name or "").strip()
+        if not n:
+            return "Error: Database name is required."
+        try:
+            conn = self._connect(database="postgres", timeout=10)
+            try:
+                conn.autocommit = True
+            except Exception:
+                try:
+                    conn.set_isolation_level(0)
+                except Exception:
+                    pass
+            cur = conn.cursor()
+            safe = n.replace('"', '""')
+            cur.execute(f'DROP DATABASE "{safe}";')
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
 
 class SQLServerAdapter(DatabaseAdapter):
     def __init__(self, app):
@@ -553,11 +646,52 @@ class SQLServerAdapter(DatabaseAdapter):
         except Exception as e:
             return f"Error: {e}"
 
+    def run_sql(self, sql_text, database=None, timeout=30):
+        try:
+            if not (sql_text or "").strip():
+                return "Error: SQL is empty."
+
+            batches = [
+                b.strip() for b in re.split(r'^\s*GO\s*$', sql_text, flags=re.IGNORECASE | re.MULTILINE)
+                if b.strip()
+            ]
+
+            conn = self._connect(database=database, timeout=max(1, int(timeout)))
+            cur = conn.cursor()
+
+            for batch in batches:
+                cur.execute(batch)
+                try:
+                    while cur.nextset():
+                        pass
+                except Exception:
+                    pass
+
+            conn.commit()
+            conn.close()
+            return "OK"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def create_database(self, name):
+        n = (name or "").strip()
+        if not n:
+            return "Error: Database name is required."
+        safe = n.replace(']', ']]')
+        return self.run_sql(f"CREATE DATABASE [{safe}];", database="master", timeout=30)
+
+    def drop_database(self, name):
+        n = (name or "").strip()
+        if not n:
+            return "Error: Database name is required."
+        safe = n.replace(']', ']]')
+        return self.run_sql(f"DROP DATABASE [{safe}];", database="master", timeout=30)
+
 
 class GitGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Dev-X-Flow-Pro v7.1.1")
+        self.root.title("Dev-X-Flow-Pro v7.1.2")
         
         # Set window icon - handle both script and bundled exe modes
         try:
@@ -624,6 +758,7 @@ class GitGUI:
         self.db_user = tk.StringVar(value="root")
         self.db_password = tk.StringVar(value="")
         self.db_name = tk.StringVar(value="")
+        self.db_new_name = tk.StringVar(value="")
         self.sql_file_path = tk.StringVar(value="")
         self.sqlite_db_path = tk.StringVar(value="")
         self.sqlserver_driver = tk.StringVar(value="ODBC Driver 17 for SQL Server")
@@ -995,7 +1130,7 @@ class GitGUI:
             label.pack(expand=True)
         
         # Version text
-        version_label = tk.Label(splash, text="v7.1.1", font=("Segoe UI", 12), 
+        version_label = tk.Label(splash, text="v7.1.2", font=("Segoe UI", 12), 
                                   bg="#1e1e1e", fg="#888888")
         version_label.pack()
         
@@ -3893,20 +4028,39 @@ Continue?"""
         db_row.pack(fill="x")
         
         ttk.Label(db_row, text="Database:").pack(side="left", padx=(0, 5))
-        
-        # Database dropdown (will be populated dynamically)
-        self.db_dropdown = ttk.Combobox(db_row, textvariable=self.db_name, 
-                                         values=[], width=25, state="normal")
+        self.db_dropdown = ttk.Combobox(
+            db_row,
+            textvariable=self.db_name,
+            values=[],
+            width=25,
+            state="normal",
+        )
         self.db_dropdown.pack(side="left", padx=(0, 10))
         self._bind_dark_combobox(self.db_dropdown)
-        
+
+        ttk.Label(db_row, text="New DB:").pack(side="left", padx=(10, 5))
+        tk.Entry(
+            db_row,
+            textvariable=self.db_new_name,
+            bg=self.colors["secondary"],
+            fg="white",
+            insertbackground="white",
+            relief="flat",
+            width=18,
+        ).pack(side="left", padx=(0, 10))
+
         ttk.Button(db_row, text="🔄 Refresh List", command=self.refresh_mysql_databases,
                   style="Secondary.TButton").pack(side="left", padx=5)
+        ttk.Button(db_row, text="➕ Create DB", command=self.create_database_action,
+                  style="Success.TButton").pack(side="left", padx=5)
+        ttk.Button(db_row, text="🗑 Drop DB", command=self.drop_database_action,
+                  style="Danger.TButton").pack(side="left", padx=5)
         ttk.Button(db_row, text="📊 View Status", command=self.view_database_status,
                   style="Action.TButton").pack(side="left", padx=5)
-        
-        # SQL File Selection Frame
-        file_frame = ttk.LabelFrame(tab, text="  SQL Import File  ")
+        ttk.Button(db_row, text="🧱 Create Table", command=self.open_create_table_wizard,
+                  style="Action.TButton").pack(side="left", padx=5)
+
+        file_frame = ttk.LabelFrame(tab, text="  SQL File  ")
         file_frame.pack(fill="x", pady=(0, 10))
         
         file_row = ttk.Frame(file_frame, padding=10)
@@ -3968,6 +4122,38 @@ Continue?"""
         output_scroll = ttk.Scrollbar(output_frame, orient="vertical", command=self.db_output_text.yview)
         output_scroll.pack(side="right", fill="y")
         self.db_output_text.config(yscrollcommand=output_scroll.set)
+
+        console_frame = ttk.LabelFrame(tab, text="  SQL / DDL Console  ")
+        console_frame.pack(fill="x", pady=(10, 0))
+
+        console_toolbar = ttk.Frame(console_frame, padding=(10, 10, 10, 0))
+        console_toolbar.pack(fill="x")
+
+        ttk.Button(console_toolbar, text="▶ Run SQL", command=self.execute_sql_console,
+                  style="Success.TButton").pack(side="left", padx=(0, 8))
+        ttk.Button(console_toolbar, text="🧹 Clear", command=self.clear_sql_console,
+                  style="Secondary.TButton").pack(side="left")
+
+        console_body = ttk.Frame(console_frame, padding=10)
+        console_body.pack(fill="x")
+
+        self.sql_console_text = tk.Text(
+            console_body,
+            height=6,
+            bg=self.colors["text_bg"],
+            fg="#d4d4d4",
+            insertbackground="#ffffff",
+            font=("Consolas", 9),
+            bd=0,
+            padx=10,
+            pady=10,
+            wrap="word",
+        )
+        self.sql_console_text.pack(side="left", fill="x", expand=True)
+
+        console_scroll = ttk.Scrollbar(console_body, orient="vertical", command=self.sql_console_text.yview)
+        console_scroll.pack(side="right", fill="y")
+        self.sql_console_text.config(yscrollcommand=console_scroll.set)
     
     def browse_sql_file(self):
         """Browse for SQL file to import"""
@@ -3978,6 +4164,335 @@ Continue?"""
         )
         if file_path:
             self.sql_file_path.set(file_path)
+
+    def clear_sql_console(self):
+        if not hasattr(self, 'sql_console_text'):
+            return
+        self.sql_console_text.delete("1.0", "end")
+
+    def execute_sql_console(self):
+        if not hasattr(self, 'sql_console_text'):
+            return
+
+        sql_text = self.sql_console_text.get("1.0", "end").strip()
+        if not sql_text:
+            self.append_db_output("Error: SQL is empty.", "error")
+            return
+
+        adapter = self.db_adapter
+        if not adapter:
+            self.append_db_output("Error: DB adapter not ready", "error")
+            return
+
+        db = (self.db_name.get() or "").strip() or None
+        if self.db_type.get() == "PostgreSQL" and not db:
+            db = "postgres"
+        if self.db_type.get() == "SQL Server" and not db:
+            db = "master"
+
+        def do_run():
+            try:
+                self.root.after(0, lambda: self.append_db_output("\n▶ Running SQL...", "info"))
+                result = adapter.run_sql(sql_text, database=db, timeout=30)
+                if isinstance(result, str) and result.startswith("Error"):
+                    self.root.after(0, lambda: self.append_db_output(result, "error"))
+                else:
+                    out = result if isinstance(result, str) and result.strip() else "OK"
+                    self.root.after(0, lambda: self.append_db_output(out, "success"))
+            except Exception as e:
+                self.root.after(0, lambda: self.append_db_output(f"Error: {e}", "error"))
+
+        threading.Thread(target=do_run, daemon=True).start()
+
+    def create_database_action(self):
+        adapter = self.db_adapter
+        if not adapter:
+            self.append_db_output("Error: DB adapter not ready", "error")
+            return
+
+        name = (self.db_new_name.get() or "").strip()
+        if not name:
+            self.append_db_output("Error: Database name is required.", "error")
+            return
+
+        ok, msg = self._validate_identifier(name)
+        if not ok:
+            self.append_db_output(msg, "error")
+            return
+
+        if not messagebox.askyesno("Create Database", f"Create database '{name}'?", icon="question"):
+            return
+
+        def do_create():
+            try:
+                self.root.after(0, lambda: self.append_db_output(f"\n➕ Creating database: {name}", "info"))
+                result = adapter.create_database(name)
+                if isinstance(result, str) and result.startswith("Error"):
+                    self.root.after(0, lambda: self.append_db_output(result, "error"))
+                    return
+                self.root.after(0, lambda: self.append_db_output("OK", "success"))
+                self.root.after(0, self.refresh_mysql_databases)
+            except Exception as e:
+                self.root.after(0, lambda: self.append_db_output(f"Error: {e}", "error"))
+
+        threading.Thread(target=do_create, daemon=True).start()
+
+    def drop_database_action(self):
+        adapter = self.db_adapter
+        if not adapter:
+            self.append_db_output("Error: DB adapter not ready", "error")
+            return
+
+        name = (self.db_new_name.get() or "").strip() or (self.db_name.get() or "").strip()
+        if not name:
+            self.append_db_output("Error: Database name is required.", "error")
+            return
+
+        ok, msg = self._validate_identifier(name)
+        if not ok:
+            self.append_db_output(msg, "error")
+            return
+
+        if not messagebox.askyesno(
+            "Drop Database",
+            f"DROP DATABASE '{name}'?\n\nThis is destructive and cannot be undone.",
+            icon="warning",
+        ):
+            return
+
+        def do_drop():
+            try:
+                self.root.after(0, lambda: self.append_db_output(f"\n🗑 Dropping database: {name}", "warning"))
+                result = adapter.drop_database(name)
+                if isinstance(result, str) and result.startswith("Error"):
+                    self.root.after(0, lambda: self.append_db_output(result, "error"))
+                    return
+                self.root.after(0, lambda: self.append_db_output("OK", "success"))
+                self.root.after(0, self.refresh_mysql_databases)
+            except Exception as e:
+                self.root.after(0, lambda: self.append_db_output(f"Error: {e}", "error"))
+
+        threading.Thread(target=do_drop, daemon=True).start()
+
+    def _validate_identifier(self, name):
+        n = (name or "").strip()
+        if not n:
+            return (False, "Error: Name is required.")
+        if len(n) > 128:
+            return (False, "Error: Name is too long.")
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", n):
+            return (False, "Error: Name must match ^[A-Za-z_][A-Za-z0-9_]*$ (simple safe identifier).")
+        return (True, "OK")
+
+    def _quote_ident(self, name):
+        n = (name or "").strip()
+        if self.db_type.get() == "MySQL/MariaDB":
+            return "`" + n.replace("`", "``") + "`"
+        if self.db_type.get() == "SQL Server":
+            return "[" + n.replace("]", "]]" ) + "]"
+        return '"' + n.replace('"', '""') + '"'
+
+    def open_create_table_wizard(self):
+        if hasattr(self, '_create_table_win') and self._create_table_win and self._create_table_win.winfo_exists():
+            try:
+                self._create_table_win.lift()
+                self._create_table_win.focus_force()
+            except Exception:
+                pass
+            return
+
+        win = tk.Toplevel(self.root)
+        self._create_table_win = win
+        win.title("Create Table")
+        win.configure(bg=self.colors["bg"])
+        win.geometry("720x520")
+
+        header = tk.Frame(win, bg=self.colors["secondary"], bd=1, relief="flat")
+        header.pack(fill="x", padx=10, pady=(10, 0))
+        tk.Label(header, text="Create Table Wizard", bg=self.colors["secondary"], fg=self.colors["fg"],
+                 font=("Segoe UI", 11, "bold")).pack(side="left", padx=10, pady=10)
+
+        body = tk.Frame(win, bg=self.colors["bg"])
+        body.pack(fill="both", expand=True, padx=10, pady=10)
+
+        top_row = tk.Frame(body, bg=self.colors["bg"])
+        top_row.pack(fill="x")
+
+        tk.Label(top_row, text="Database:", bg=self.colors["bg"], fg=self.colors["fg"]).pack(side="left", padx=(0, 5))
+        db_display = tk.Label(top_row, text=(self.db_name.get() or "(default)"), bg=self.colors["bg"], fg=self.colors["accent"])
+        db_display.pack(side="left", padx=(0, 20))
+
+        tk.Label(top_row, text="Table name:", bg=self.colors["bg"], fg=self.colors["fg"]).pack(side="left", padx=(0, 5))
+        self._ct_table_name = tk.StringVar(value="")
+        tk.Entry(top_row, textvariable=self._ct_table_name,
+                 bg=self.colors["secondary"], fg="white", insertbackground="white",
+                 relief="flat", width=24).pack(side="left")
+
+        cols_frame = ttk.LabelFrame(body, text="  Columns  ")
+        cols_frame.pack(fill="both", expand=True, pady=(10, 10))
+
+        cols_toolbar = tk.Frame(cols_frame, bg=self.colors["bg"])
+        cols_toolbar.pack(fill="x", padx=10, pady=(10, 0))
+        ttk.Button(cols_toolbar, text="+ Add Column", command=self._ct_add_column_row,
+                  style="Secondary.TButton").pack(side="left")
+        ttk.Button(cols_toolbar, text="- Remove Last", command=self._ct_remove_last_column_row,
+                  style="Secondary.TButton").pack(side="left", padx=(8, 0))
+
+        header_row = tk.Frame(cols_frame, bg=self.colors["bg"])
+        header_row.pack(fill="x", padx=10, pady=(10, 0))
+        tk.Label(header_row, text="Name", bg=self.colors["bg"], fg=self.colors["fg"], width=18, anchor="w").pack(side="left")
+        tk.Label(header_row, text="Type", bg=self.colors["bg"], fg=self.colors["fg"], width=18, anchor="w").pack(side="left", padx=(5, 0))
+        tk.Label(header_row, text="Nullable", bg=self.colors["bg"], fg=self.colors["fg"], width=10, anchor="w").pack(side="left", padx=(5, 0))
+        tk.Label(header_row, text="PK", bg=self.colors["bg"], fg=self.colors["fg"], width=6, anchor="w").pack(side="left", padx=(5, 0))
+
+        self._ct_cols_container = tk.Frame(cols_frame, bg=self.colors["bg"])
+        self._ct_cols_container.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+        self._ct_col_rows = []
+
+        self._ct_add_column_row()
+        self._ct_add_column_row()
+
+        bottom = tk.Frame(body, bg=self.colors["bg"])
+        bottom.pack(fill="x")
+
+        ttk.Button(bottom, text="Preview SQL", command=self._ct_preview_sql,
+                  style="Action.TButton").pack(side="left")
+        ttk.Button(bottom, text="Create Table", command=self._ct_execute_create_table,
+                  style="Success.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(bottom, text="Close", command=win.destroy,
+                  style="Secondary.TButton").pack(side="right")
+
+    def _ct_types_for_engine(self):
+        t = self.db_type.get()
+        if t == "MySQL/MariaDB":
+            return ["INT", "BIGINT", "VARCHAR(255)", "TEXT", "DATETIME", "DATE", "DECIMAL(10,2)", "BOOLEAN"]
+        if t == "PostgreSQL":
+            return ["INTEGER", "BIGINT", "VARCHAR(255)", "TEXT", "TIMESTAMP", "DATE", "NUMERIC(10,2)", "BOOLEAN"]
+        if t == "SQL Server":
+            return ["INT", "BIGINT", "NVARCHAR(255)", "NVARCHAR(MAX)", "DATETIME2", "DATE", "DECIMAL(10,2)", "BIT"]
+        return ["INTEGER", "TEXT", "REAL", "BLOB", "NUMERIC"]
+
+    def _ct_add_column_row(self):
+        row = tk.Frame(self._ct_cols_container, bg=self.colors["bg"])
+        row.pack(fill="x", pady=3)
+
+        name_var = tk.StringVar(value="")
+        type_var = tk.StringVar(value=self._ct_types_for_engine()[0])
+        nullable_var = tk.BooleanVar(value=True)
+        pk_var = tk.BooleanVar(value=False)
+
+        tk.Entry(row, textvariable=name_var,
+                 bg=self.colors["secondary"], fg="white", insertbackground="white",
+                 relief="flat", width=22).pack(side="left")
+
+        type_cb = ttk.Combobox(row, textvariable=type_var, values=self._ct_types_for_engine(), state="readonly", width=18)
+        type_cb.pack(side="left", padx=(5, 0))
+        self._bind_dark_combobox(type_cb)
+
+        tk.Checkbutton(
+            row,
+            variable=nullable_var,
+            bg=self.colors["bg"],
+            activebackground=self.colors["bg"],
+            selectcolor=self.colors["bg"],
+            highlightthickness=0,
+            bd=0,
+        ).pack(side="left", padx=(18, 0))
+
+        tk.Checkbutton(
+            row,
+            variable=pk_var,
+            bg=self.colors["bg"],
+            activebackground=self.colors["bg"],
+            selectcolor=self.colors["bg"],
+            highlightthickness=0,
+            bd=0,
+        ).pack(side="left", padx=(30, 0))
+
+        self._ct_col_rows.append((row, name_var, type_var, nullable_var, pk_var))
+
+    def _ct_remove_last_column_row(self):
+        if not getattr(self, '_ct_col_rows', None):
+            return
+        row, *_ = self._ct_col_rows.pop()
+        try:
+            row.destroy()
+        except Exception:
+            pass
+
+    def _ct_build_sql(self):
+        table = (self._ct_table_name.get() or "").strip()
+        if not table:
+            return (None, "Error: Table name is required.")
+
+        ok, msg = self._validate_identifier(table)
+        if not ok:
+            return (None, msg)
+
+        cols = []
+        pk_cols = []
+        for _, name_var, type_var, nullable_var, pk_var in getattr(self, '_ct_col_rows', []):
+            cname = (name_var.get() or "").strip()
+            if not cname:
+                continue
+            ok, msg = self._validate_identifier(cname)
+            if not ok:
+                return (None, msg)
+            ctype = (type_var.get() or "").strip()
+            null_sql = "" if nullable_var.get() else " NOT NULL"
+            cols.append(f"{self._quote_ident(cname)} {ctype}{null_sql}")
+            if pk_var.get():
+                pk_cols.append(self._quote_ident(cname))
+
+        if not cols:
+            return (None, "Error: At least one column is required.")
+
+        if pk_cols:
+            cols.append(f"PRIMARY KEY ({', '.join(pk_cols)})")
+
+        sql = f"CREATE TABLE {self._quote_ident(table)} (\n  " + ",\n  ".join(cols) + "\n);"
+        return (sql, None)
+
+    def _ct_preview_sql(self):
+        sql, err = self._ct_build_sql()
+        if err:
+            self.append_db_output(err, "error")
+            return
+        self.append_db_output("\n" + sql, "info")
+
+    def _ct_execute_create_table(self):
+        adapter = self.db_adapter
+        if not adapter:
+            self.append_db_output("Error: DB adapter not ready", "error")
+            return
+
+        sql, err = self._ct_build_sql()
+        if err:
+            self.append_db_output(err, "error")
+            return
+
+        db = (self.db_name.get() or "").strip() or None
+        if self.db_type.get() == "PostgreSQL" and not db:
+            db = "postgres"
+        if self.db_type.get() == "SQL Server" and not db:
+            db = "master"
+
+        if not messagebox.askyesno("Create Table", "Execute CREATE TABLE now?", icon="question"):
+            return
+
+        def do_run():
+            try:
+                self.root.after(0, lambda: self.append_db_output("\n🧱 Creating table...", "info"))
+                result = adapter.run_sql(sql, database=db, timeout=60)
+                if isinstance(result, str) and result.startswith("Error"):
+                    self.root.after(0, lambda: self.append_db_output(result, "error"))
+                    return
+                self.root.after(0, lambda: self.append_db_output("OK", "success"))
+                self.root.after(0, self.view_database_status)
+            except Exception as e:
+                self.root.after(0, lambda: self.append_db_output(f"Error: {e}", "error"))
+
+        threading.Thread(target=do_run, daemon=True).start()
     
     def run_mysql_command(self, args, database=None, show_error=True, timeout=30):
         """Execute a MySQL command with timeout"""

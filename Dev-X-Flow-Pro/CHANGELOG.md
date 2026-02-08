@@ -17,6 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.1.2] - 2026-02-08
+
+### Added
+- **Database DDL**: Added DDL helpers across all engines via adapter layer:
+  - `run_sql(sql_text, database=None, timeout=30)`
+  - `create_database(name)` / `drop_database(name)` (where supported)
+- **SQL/DDL Console**: Added an in-app SQL editor to run arbitrary SQL/DDL statements.
+- **Create/Drop Database UI**: Added Create DB + Drop DB actions with confirmations.
+- **Create Table Wizard**: Added a wizard UI to generate and execute `CREATE TABLE`.
+
+### Safety
+- Added basic identifier validation for DB/table/column names.
+
+---
+
 ## [7.1.1] - 2026-02-08
 
 ### Fixed
