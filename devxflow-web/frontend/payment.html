@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment - Dev-X-Flow-Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .payment-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 500px;
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .logo p {
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+        
+        .price-tag {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .price {
+            font-size: 48px;
+            font-weight: 700;
+            color: #4a90e2;
+        }
+        
+        .price span {
+            font-size: 16px;
+            opacity: 0.7;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid transparent;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .pay-btn {
+            width: 100%;
+            padding: 18px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        
+        .pay-btn:hover {
+            background: #357abd;
+            transform: translateY(-2px);
+        }
+        
+        .pay-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .secure-badge {
+            text-align: center;
+            margin-top: 20px;
+            opacity: 0.6;
+            font-size: 12px;
+        }
+        
+        .payment-methods {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .payment-method {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .success {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .success.active {
+            display: block;
+        }
+        
+        .license-key {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 18px;
+            margin: 20px 0;
+            border: 2px dashed #4a90e2;
+            word-break: break-all;
+        }
+        
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .error.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <div id="payment-form">
+            <div class="logo">
+                <h1>Dev-X-Flow-Pro</h1>
+                <p>Get your license key</p>
+            </div>
+            
+            <div class="price-tag">
+                <div class="price" id="priceDisplay">₱399</div>
+                <div id="planDetails">1 Year License • 3 devices</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="your@email.com" required>
+            </div>
+            
+            <button class="pay-btn" id="payBtn" onclick="initiatePayment()">
+                Pay with GCash
+            </button>
+            
+            <div class="loading" id="loading">
+                <p>Processing payment...</p>
+            </div>
+            
+            <div class="error" id="error"></div>
+            
+            <div class="secure-badge">
+                🔒 Secure payment via PayMongo
+            </div>
+            
+            <div class="payment-methods">
+                <div class="payment-method">GCash</div>
+            </div>
+        </div>
+        
+        <div class="success" id="success">
+            <h2>🎉 Payment Successful!</h2>
+            <p>Your license key has been generated.</p>
+            <div class="license-key" id="licenseKey"></div>
+            <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">
+                This key has been sent to your email.<br>
+                Save it securely - you'll need it to activate Dev-X-Flow-Pro.
+            </p>
+            <button class="pay-btn" onclick="window.location.href='/'" style="margin-top: 20px;">
+                Back to Home
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin + '/api';
+        
+        // Parse plan from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const plan = urlParams.get('plan') || '1year';
+        
+        // Plan configuration
+        const plans = {
+            '1year': { price: 399, amount: 39900, name: '1 Year License', devices: '3 devices' },
+            '3year': { price: 899, amount: 89900, name: '3 Year License', devices: '5 devices' }
+        };
+        
+        const selectedPlan = plans[plan] || plans['1year'];
+        
+        // Update UI with plan details
+        document.querySelector('.price').textContent = '₱' + selectedPlan.price;
+        document.querySelector('.price-tag div:last-child').textContent = selectedPlan.name + ' • ' + selectedPlan.devices;
+        
+        async function initiatePayment() {
+            const email = document.getElementById('email').value;
+            const btn = document.getElementById('payBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            
+            if (!email || !email.includes('@')) {
+                error.textContent = 'Please enter a valid email address';
+                error.classList.add('active');
+                return;
+            }
+            
+            btn.disabled = true;
+            loading.classList.add('active');
+            error.classList.remove('active');
+            
+            try {
+                // Create payment intent with dynamic amount
+                const response = await fetch(`${API_BASE}/payment/create-intent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, amount: selectedPlan.amount })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Payment initialization failed');
+                }
+                
+                // For now, show a manual payment flow
+                // In production, this would redirect to PayMongo checkout
+                alert('In production mode, you would be redirected to GCash payment.\n\nFor demo purposes, please contact us to complete your purchase.');
+                
+                // Simulate successful payment for demo
+                document.getElementById('payment-form').style.display = 'none';
+                document.getElementById('success').classList.add('active');
+                document.getElementById('licenseKey').textContent = 'XXXX-XXXX-XXXX-XXXX';
+                
+            } catch (err) {
+                error.textContent = err.message;
+                error.classList.add('active');
+                btn.disabled = false;
+                loading.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>

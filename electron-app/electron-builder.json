@@ -1,0 +1,15 @@
+{
+  "appId": "com.devxflowpro.app",
+  "productName": "Dev-X-Flow-Pro",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist-main/**",
+    "dist-renderer/**",
+    "package.json"
+  ],
+  "win": {
+    "target": "nsis"
+  }
+}

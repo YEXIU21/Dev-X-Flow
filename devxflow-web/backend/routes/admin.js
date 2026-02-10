@@ -1,0 +1,163 @@
+const express = require('express');
+const { models } = require('../database');
+const auth = require('./auth');
+
+const router = express.Router();
+
+// All admin routes require authentication
+router.use(auth.verifyToken);
+
+// Get dashboard stats
+router.get('/stats', async (req, res) => {
+    try {
+        // Get license stats using MongoDB aggregation
+        const totalLicenses = await models.License.countDocuments();
+        const activeLicenses = await models.License.countDocuments({ 
+            status: 'active',
+            $or: [
+                { expires_at: null },
+                { expires_at: { $gt: new Date() } }
+            ]
+        });
+        const revokedLicenses = await models.License.countDocuments({ status: 'revoked' });
+        const expiredLicenses = await models.License.countDocuments({
+            status: 'active',
+            expires_at: { $lt: new Date() }
+        });
+        const totalActivations = await models.Activation.countDocuments();
+
+        // Get recent validation logs (last 24 hours)
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const recentValidations = await models.ValidationLog.aggregate([
+            { $match: { validated_at: { $gt: yesterday } } },
+            { $group: { _id: '$result', count: { $sum: 1 } } }
+        ]);
+
+        res.json({
+            success: true,
+            stats: {
+                total_licenses: totalLicenses,
+                active_licenses: activeLicenses,
+                revoked_licenses: revokedLicenses,
+                expired_licenses: expiredLicenses,
+                total_activations: totalActivations,
+                recent_validations: recentValidations.map(v => ({ result: v._id, count: v.count }))
+            }
+        });
+
+    } catch (error) {
+        console.error('Get stats error:', error);
+        res.status(500).json({ error: 'Failed to get stats' });
+    }
+});
+
+// Get validation logs with pagination
+router.get('/logs', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+
+        const logs = await models.ValidationLog
+            .find()
+            .sort({ validated_at: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean();
+
+        const total = await models.ValidationLog.countDocuments();
+
+        res.json({
+            success: true,
+            logs,
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+
+    } catch (error) {
+        console.error('Get logs error:', error);
+        res.status(500).json({ error: 'Failed to get logs' });
+    }
+});
+
+// Search licenses
+router.get('/search', async (req, res) => {
+    try {
+        const { q } = req.query;
+        
+        if (!q) {
+            return res.status(400).json({ error: 'Search query required' });
+        }
+
+        // Search using MongoDB regex
+        const licenses = await models.License.find({
+            $or: [
+                { license_key: { $regex: q, $options: 'i' } },
+                { customer_email: { $regex: q, $options: 'i' } }
+            ]
+        })
+        .sort({ created_at: -1 })
+        .lean();
+
+        // Get activation counts for each license
+        const licensesWithCounts = await Promise.all(licenses.map(async (license) => {
+            const activationCount = await models.Activation.countDocuments({ license_id: license._id });
+            return {
+                ...license,
+                current_activations: activationCount
+            };
+        }));
+
+        res.json({
+            success: true,
+            licenses: licensesWithCounts
+        });
+
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+// Change admin password
+router.post('/change-password', async (req, res) => {
+    try {
+        const { current_password, new_password } = req.body;
+        const adminId = req.admin.adminId;
+
+        // Get current admin using Mongoose
+        const admin = await models.Admin.findById(adminId);
+        
+        // Verify current password
+        const bcrypt = require('bcryptjs');
+        const isValid = await bcrypt.compare(current_password, admin.password_hash);
+        
+        if (!isValid) {
+            return res.status(400).json({ error: 'Current password is incorrect' });
+        }
+
+        // Hash new password
+        const newHash = await bcrypt.hash(new_password, 10);
+        
+        // Update password
+        admin.password_hash = newHash;
+        await admin.save();
+
+        res.json({
+            success: true,
+            message: 'Password changed successfully'
+        });
+
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'Failed to change password' });
+    }
+});
+
+module.exports = router;

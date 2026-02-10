@@ -1,4 +1,5 @@
-import tkinter as tk
+from license_manager import LicenseManager, LicenseDialog, check_license_on_startup
+
 from tkinter import ttk, messagebox, filedialog
 import subprocess
 import os
@@ -750,6 +751,10 @@ class GitGUI:
         self.ai_config_file = os.path.join(os.path.expanduser("~"), ".gitflow_ai_config.json")
         self.load_ai_config()
         
+        # License Management
+        self.license_manager = LicenseManager(self.root)
+        self.license_valid = False
+        
         # Database Configuration
         self.db_type = tk.StringVar(value="MySQL/MariaDB")
         self.db_host = tk.StringVar(value="127.0.0.1")
@@ -956,6 +961,14 @@ class GitGUI:
         self.create_widgets()
         self.check_git_repo()
         self.detect_project_type()
+        
+        # Check license on startup
+        self.license_valid = check_license_on_startup(self.root, show_dialog=True)
+        if not self.license_valid:
+            # Show warning but allow trial use
+            messagebox.showwarning("Trial Mode", 
+                "No valid license found. Running in trial mode.\n\n"
+                "Please activate your license in Settings > License.")
 
     def _apply_dark_combobox_popdown(self, combobox):
         try:
@@ -1361,6 +1374,8 @@ class GitGUI:
         ttk.Button(controls_frame, text="🗑 Delete Branch", command=self.delete_branch,
                   style="Danger.TButton").pack(side="left", padx=5)
         ttk.Button(controls_frame, text="👤 Git Author", command=self.configure_git_author,
+                  style="Secondary.TButton").pack(side="left", padx=5)
+        ttk.Button(controls_frame, text="🔑 License", command=self.configure_license,
                   style="Secondary.TButton").pack(side="left", padx=5)
         ttk.Button(controls_frame, text="↻ Refresh", command=self.refresh_all, 
                   style="Secondary.TButton").pack(side="right")
@@ -2125,6 +2140,139 @@ class GitGUI:
         
         api_entry.focus_set()
         api_entry.bind("<Return>", lambda e: save_api())
+
+    def configure_license(self):
+        """Open dialog to configure software license"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("License Configuration")
+        dialog.geometry("500x400")
+        dialog.configure(bg=self.colors["bg"])
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        self.center_window(dialog, 500, 400)
+        
+        # Get current license status
+        status = self.license_manager.get_license_status()
+        
+        # Title
+        tk.Label(dialog, text="License Management", font=("Segoe UI", 16, "bold"),
+                bg=self.colors["bg"], fg=self.colors["fg"]).pack(pady=(20, 10))
+        
+        # Current status frame
+        status_frame = tk.Frame(dialog, bg=self.colors["secondary"], bd=1, relief="flat")
+        status_frame.pack(fill="x", padx=20, pady=10, ipady=10)
+        
+        tk.Label(status_frame, text="Current Status:", font=("Segoe UI", 10, "bold"),
+                bg=self.colors["secondary"], fg="#888888").pack(anchor="w", padx=10, pady=(5, 0))
+        
+        status_label = tk.Label(status_frame, text=status["status_text"], 
+                               font=("Segoe UI", 12, "bold"),
+                               bg=self.colors["secondary"], 
+                               fg=status["status_color"])
+        status_label.pack(anchor="w", padx=10, pady=5)
+        
+        if status["has_license"]:
+            tk.Label(status_frame, text=f"Key: {status['license_key']}", 
+                    font=("Consolas", 10),
+                    bg=self.colors["secondary"], fg="#888888").pack(anchor="w", padx=10)
+        
+        # License key entry
+        tk.Label(dialog, text="Enter License Key:", font=("Segoe UI", 10, "bold"),
+                bg=self.colors["bg"], fg=self.colors["fg"]).pack(pady=(20, 5), padx=20, anchor="w")
+        
+        key_frame = tk.Frame(dialog, bg=self.colors["bg"])
+        key_frame.pack(fill="x", padx=20, pady=5)
+        
+        license_entry = tk.Entry(key_frame, 
+            bg=self.colors["secondary"],
+            fg="white",
+            insertbackground="white",
+            relief="flat",
+            font=("Consolas", 12),
+            width=25
+        )
+        license_entry.pack(fill="x", ipady=5)
+        license_entry.insert(0, self.license_manager.get_stored_license_key())
+        
+        # Format placeholder
+        tk.Label(dialog, text="Format: XXXX-XXXX-XXXX-XXXX",
+                font=("Segoe UI", 9), bg=self.colors["bg"], fg="#888888").pack(anchor="w", padx=20)
+        
+        # Auto-format on typing
+        def format_key(event=None):
+            key = license_entry.get().upper().replace("-", "").replace(" ", "")
+            key = "".join(c for c in key if c.isalnum())[:16]
+            formatted = ""
+            for i, c in enumerate(key):
+                if i > 0 and i % 4 == 0:
+                    formatted += "-"
+                formatted += c
+            license_entry.delete(0, tk.END)
+            license_entry.insert(0, formatted)
+        
+        license_entry.bind("<KeyRelease>", format_key)
+        
+        # Buttons frame
+        btn_frame = tk.Frame(dialog, bg=self.colors["bg"])
+        btn_frame.pack(fill="x", side="bottom", padx=20, pady=20)
+        
+        def activate_license():
+            key = license_entry.get().strip()
+            if len(key.replace("-", "")) != 16:
+                messagebox.showwarning("Invalid Key", "Please enter a valid 16-character license key.", parent=dialog)
+                return
+            
+            # Validate online
+            result = self.license_manager.validate_license(key, online=True)
+            
+            if result.get("valid"):
+                self.license_manager.save_license_key(key)
+                self.license_valid = True
+                messagebox.showinfo("Success", "License activated successfully!", parent=dialog)
+                dialog.destroy()
+            else:
+                error_msg = result.get("error", "Validation failed")
+                if result.get("offline"):
+                    error_msg += "\n\nPlease check your internet connection and try again."
+                messagebox.showerror("Activation Failed", error_msg, parent=dialog)
+        
+        def buy_license():
+            import webbrowser
+            webbrowser.open("http://localhost:3000/#pricing")
+        
+        def deactivate_license():
+            if messagebox.askyesno("Confirm Deactivation", 
+                "This will deactivate this device from your license.\n\nContinue?",
+                parent=dialog):
+                result = self.license_manager.deactivate_device()
+                if result.get("success"):
+                    self.license_valid = False
+                    messagebox.showinfo("Success", "License deactivated successfully.", parent=dialog)
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", result.get("error", "Deactivation failed"), parent=dialog)
+        
+        # Button layout
+        if status["has_license"]:
+            tk.Button(btn_frame, text="Deactivate", command=deactivate_license,
+                     bg="#e74c3c", fg="white", font=("Segoe UI", 10),
+                     width=12, cursor="hand2").pack(side="left", padx=5)
+        
+        tk.Button(btn_frame, text="Buy License", command=buy_license,
+                 bg=self.colors["secondary"], fg=self.colors["fg"], 
+                 font=("Segoe UI", 10), width=12, cursor="hand2").pack(side="left", padx=5)
+        
+        tk.Button(btn_frame, text="Cancel", command=dialog.destroy,
+                 bg=self.colors["secondary"], fg=self.colors["fg"],
+                 font=("Segoe UI", 10), width=12, cursor="hand2").pack(side="right", padx=5)
+        
+        tk.Button(btn_frame, text="Activate", command=activate_license,
+                 bg="#4a90e2", fg="white", font=("Segoe UI", 10, "bold"),
+                 width=12, cursor="hand2").pack(side="right", padx=5)
+        
+        license_entry.focus_set()
+        license_entry.bind("<Return>", lambda e: activate_license())
 
     # ===== Pull Operations =====
     

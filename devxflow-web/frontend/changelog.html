@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Changelog - Dev-X-Flow-Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --accent: #00d4ff;
+            --accent-glow: rgba(0, 212, 255, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #8b8b9a;
+            --success: #00ff88;
+            --warning: #ffaa00;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 20px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--accent-glow);
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+        
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+        
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+        
+        /* Main Content */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 120px 20px 60px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 15px;
+            color: var(--accent);
+        }
+        
+        .header p {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+        
+        /* Version Cards */
+        .version-card {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(0, 212, 255, 0.1);
+            transition: all 0.3s;
+        }
+        
+        .version-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.1);
+        }
+        
+        .version-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .version-number {
+            background: var(--accent);
+            color: var(--bg-primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        
+        .version-date {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .version-badge {
+            margin-left: auto;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-latest {
+            background: var(--success);
+            color: var(--bg-primary);
+        }
+        
+        .badge-beta {
+            background: var(--warning);
+            color: var(--bg-primary);
+        }
+        
+        .changes-list {
+            list-style: none;
+        }
+        
+        .changes-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        
+        .changes-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .change-type {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .type-feature {
+            background: rgba(0, 212, 255, 0.2);
+            color: var(--accent);
+        }
+        
+        .type-fix {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--success);
+        }
+        
+        .type-improvement {
+            background: rgba(255, 170, 0, 0.2);
+            color: var(--warning);
+        }
+        
+        .change-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px;
+            border-top: 1px solid rgba(0, 212, 255, 0.1);
+            margin-top: 40px;
+        }
+        
+        .footer p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav { padding: 15px 20px; }
+            .nav-links { display: none; }
+            .container { padding-top: 100px; }
+            .version-header { flex-wrap: wrap; }
+            .version-badge { margin-left: 0; margin-top: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="logo">Dev-X-Flow-Pro</div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/#features">Features</a>
+            <a href="changelog.html">Changelog</a>
+            <a href="contact.html">Contact</a>
+            <a href="login.html">Login</a>
+            <a href="payment.html">Buy Now</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="header">
+            <h1>Changelog</h1>
+            <p>Track the evolution of Dev-X-Flow-Pro</p>
+        </div>
+        
+        <div class="version-card">
+            <div class="version-header">
+                <div class="version-number">v7.1.2</div>
+                <div class="version-date">2026-02-08</div>
+                <div class="version-badge badge-latest">Latest</div>
+            </div>
+            <ul class="changes-list">
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Database DDL helpers: run_sql(), create_database(), drop_database()</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">SQL/DDL Console - in-app SQL editor</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Create/Drop Database UI with confirmations</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Create Table Wizard for generating CREATE TABLE statements</span>
+                </li>
+                <li>
+                    <span class="change-type type-improvement">SAFETY</span>
+                    <span class="change-text">Added basic identifier validation for DB/table/column names</span>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="version-card">
+            <div class="version-header">
+                <div class="version-number">v7.1.1</div>
+                <div class="version-date">2026-02-08</div>
+            </div>
+            <ul class="changes-list">
+                <li>
+                    <span class="change-type type-fix">FIXED</span>
+                    <span class="change-text">UI Crash: tk.TclError unknown option "-bg" on ttk.Entry</span>
+                </li>
+                <li>
+                    <span class="change-type type-fix">FIXED</span>
+                    <span class="change-text">Dark mode consistency for dropdowns and checkboxes</span>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="version-card">
+            <div class="version-header">
+                <div class="version-number">v7.1</div>
+                <div class="version-date">2026-02-08</div>
+            </div>
+            <ul class="changes-list">
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Multi-Database Support (MySQL, PostgreSQL, SQL Server, SQLite)</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Database Adapter Architecture with unified interface</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">MySQL/MariaDB support with CLI auto-detection</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">SQLite native support with file picker</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">PostgreSQL support with psycopg driver</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">SQL Server support with pyodbc driver</span>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="version-card">
+            <div class="version-header">
+                <div class="version-number">v7.0</div>
+                <div class="version-date">2026-02-08</div>
+            </div>
+            <ul class="changes-list">
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Initial Dev-X-Flow-Pro Release</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Modern dark UI with tabbed interface</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Repository management (commit, push, pull, stash)</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">AI-powered commit message generation (7 providers)</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Integrated terminal with project-type detection</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Laravel debug log monitoring</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Git diff viewer and merge conflict resolver</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">Interactive rebase support</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">NEW</span>
+                    <span class="change-text">MySQL database management integration</span>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="version-card">
+            <div class="version-header">
+                <div class="version-number">v6.x</div>
+                <div class="version-date">Pre-release</div>
+            </div>
+            <ul class="changes-list">
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Interactive Rebase Tab for commit history management</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Git Diff Viewer with color-coded output</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Merge Conflict Resolver with 3-way view</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Git Author Configuration Dialog</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">7 AI Provider Support (OpenAI, Gemini, Claude, etc.)</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Debug Tools with Laravel log monitoring</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Integrated Terminal with command history</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Sync to Main Workflow (commit → merge → push → pull)</span>
+                </li>
+                <li>
+                    <span class="change-type type-feature">FEATURE</span>
+                    <span class="change-text">Modern Dark UI Theme</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <p>&copy; 2026 Dev-X-Flow-Pro. All rights reserved.</p>
+    </footer>
+</body>
+</html>
