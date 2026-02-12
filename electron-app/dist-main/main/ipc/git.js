@@ -1,9 +1,13 @@
-import { app, dialog, ipcMain } from 'electron';
+import { app, dialog, ipcMain, shell } from 'electron';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { isAbsolute, resolve as resolvePath } from 'node:path';
 import { simpleGit } from 'simple-git';
 import Database from 'better-sqlite3';
+ipcMain.on('open-external-url', (event, url) => {
+    shell.openExternal(url);
+});
 async function getConflicts(repoPath) {
     const git = simpleGit({ baseDir: repoPath });
     const status = await git.status();
@@ -14,6 +18,145 @@ async function getConflictVersion(repoPath, filePath, stage) {
     if (!filePath)
         throw new Error('filePath is required');
     return await git.raw(['show', `:${stage}:${filePath}`]);
+}
+/**
+ * Parse a conflicted file and extract base/ours/theirs sections
+ */
+async function parseConflictFile(repoPath, filePath) {
+    const fullPath = resolvePath(repoPath, filePath);
+    const content = readFileSync(fullPath, 'utf-8');
+    const baseLines = [];
+    const oursLines = [];
+    const theirsLines = [];
+    let inConflict = false;
+    let currentSection = null;
+    for (const line of content.split('\n')) {
+        if (line.startsWith('<<<<<<<')) {
+            inConflict = true;
+            currentSection = 'ours';
+        }
+        else if (line.startsWith('=======')) {
+            currentSection = 'theirs';
+        }
+        else if (line.startsWith('>>>>>>>')) {
+            inConflict = false;
+            currentSection = null;
+        }
+        else {
+            if (!inConflict) {
+                // Common line - add to all sections
+                baseLines.push(line);
+                oursLines.push(line);
+                theirsLines.push(line);
+            }
+            else if (currentSection === 'ours') {
+                oursLines.push(line);
+            }
+            else if (currentSection === 'theirs') {
+                theirsLines.push(line);
+            }
+        }
+    }
+    return {
+        base: baseLines.join('\n'),
+        ours: oursLines.join('\n'),
+        theirs: theirsLines.join('\n')
+    };
+}
+/**
+ * Resolve a conflict by accepting one side
+ */
+async function resolveConflict(repoPath, filePath, side) {
+    const fullPath = resolvePath(repoPath, filePath);
+    const content = readFileSync(fullPath, 'utf-8');
+    const resolvedLines = [];
+    let inConflict = false;
+    let keepTheirs = false;
+    for (const line of content.split('\n')) {
+        if (line.startsWith('<<<<<<<')) {
+            inConflict = true;
+            keepTheirs = (side === 'theirs');
+        }
+        else if (line.startsWith('=======')) {
+            keepTheirs = (side === 'ours');
+        }
+        else if (line.startsWith('>>>>>>>')) {
+            inConflict = false;
+            keepTheirs = false;
+        }
+        else {
+            if (!inConflict || keepTheirs) {
+                resolvedLines.push(line);
+            }
+        }
+    }
+    writeFileSync(fullPath, resolvedLines.join('\n'), 'utf-8');
+    return true;
+}
+/**
+ * Mark a file as resolved by staging it
+ */
+async function markResolved(repoPath, filePath) {
+    const git = simpleGit({ baseDir: repoPath });
+    await git.add(filePath);
+    return true;
+}
+/**
+ * Load commits for interactive rebase
+ */
+async function loadRebaseCommits(repoPath, baseCommit) {
+    const git = simpleGit({ baseDir: repoPath });
+    // Default to HEAD~10 if no base specified
+    const base = baseCommit || 'HEAD~10';
+    const log = await git.log({
+        from: base,
+        to: 'HEAD',
+        format: {
+            hash: '%H',
+            message: '%s'
+        }
+    });
+    // Return in reverse order (oldest first) for rebase todo
+    return log.all.slice().reverse().map((commit) => ({
+        action: 'pick',
+        hash: commit.hash,
+        message: commit.message
+    }));
+}
+/**
+ * Write git-rebase-todo file
+ */
+async function writeRebaseTodoFile(repoPath, items) {
+    const gitDir = await simpleGit({ baseDir: repoPath }).revparse(['--git-dir']);
+    const todoPath = resolvePath(gitDir.trim(), 'rebase-merge', 'git-rebase-todo');
+    const todoContent = items
+        .filter(item => item.action !== 'drop')
+        .map(item => `${item.action} ${item.hash} ${item.message}`)
+        .join('\n');
+    // Ensure directory exists
+    const todoDir = resolvePath(gitDir.trim(), 'rebase-merge');
+    if (!existsSync(todoDir)) {
+        throw new Error('Not in an interactive rebase. Start rebase first.');
+    }
+    writeFileSync(todoPath, todoContent + '\n', 'utf-8');
+    return true;
+}
+/**
+ * Start interactive rebase
+ */
+async function startInteractiveRebase(repoPath, items) {
+    const git = simpleGit({ baseDir: repoPath });
+    if (items.length === 0) {
+        return 'No commits to rebase';
+    }
+    const firstCommit = items[0].hash;
+    try {
+        await git.raw(['rebase', '-i', `${firstCommit}^`]);
+        return 'Rebase started successfully';
+    }
+    catch (error) {
+        return `Rebase failed: ${error instanceof Error ? error.message : String(error)}`;
+    }
 }
 async function getStatusSummary(repoPath) {
     const git = simpleGit({ baseDir: repoPath });
@@ -102,8 +245,26 @@ async function addRemote(repoPath, name, url) {
 }
 async function fetchRemote(repoPath) {
     const git = simpleGit({ baseDir: repoPath });
-    const res = await git.fetch();
+    const res = await git.fetch(['--all']);
     return JSON.stringify(res, null, 2);
+}
+async function getGitAuthor() {
+    const git = simpleGit();
+    const name = (await git.raw(['config', 'user.name'])).trim();
+    const email = (await git.raw(['config', 'user.email'])).trim();
+    return { name, email };
+}
+async function setGitAuthor(name, email) {
+    const git = simpleGit();
+    const n = (name || '').trim();
+    const e = (email || '').trim();
+    if (!n)
+        throw new Error('name is required');
+    if (!e)
+        throw new Error('email is required');
+    await git.raw(['config', '--global', 'user.name', n]);
+    await git.raw(['config', '--global', 'user.email', e]);
+    return true;
 }
 async function pullRemote(repoPath, mode) {
     const git = simpleGit({ baseDir: repoPath });
@@ -280,7 +441,71 @@ async function runTerminal(repoPath, command) {
         });
     });
 }
+function getTerminalHistoryPath() {
+    return resolvePath(homedir(), '.git_helper_terminal_history.json');
+}
+function readTerminalHistory() {
+    const p = getTerminalHistoryPath();
+    try {
+        if (!existsSync(p))
+            return [];
+        const raw = readFileSync(p, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed))
+            return [];
+        return parsed.filter((v) => typeof v === 'string').slice(0, 200);
+    }
+    catch {
+        return [];
+    }
+}
+function writeTerminalHistory(items) {
+    const p = getTerminalHistoryPath();
+    const normalized = items
+        .map((s) => (typeof s === 'string' ? s.trim() : ''))
+        .filter(Boolean)
+        .slice(0, 200);
+    writeFileSync(p, JSON.stringify(normalized, null, 2), 'utf8');
+    return true;
+}
+function addTerminalHistoryItem(command) {
+    const c = (command || '').trim();
+    if (!c)
+        return true;
+    const current = readTerminalHistory();
+    const next = [c, ...current.filter((x) => x !== c)];
+    return writeTerminalHistory(next);
+}
+function detectProjectType(repoPath) {
+    const has = (...parts) => existsSync(resolvePath(repoPath, ...parts));
+    if (has('artisan') || has('composer.json'))
+        return 'Laravel';
+    if (has('package.json'))
+        return 'Node.js';
+    if (has('pyproject.toml') || has('requirements.txt'))
+        return 'Python';
+    return 'General';
+}
+function getTerminalSuggestions(projectType) {
+    switch (projectType) {
+        case 'Laravel':
+            return ['php artisan --version', 'php artisan migrate', 'php artisan route:list', 'php artisan config:cache', 'php artisan optimize', 'composer install'];
+        case 'Node.js':
+            return ['node -v', 'npm -v', 'npm install', 'npm run build', 'npm test', 'npm run dev'];
+        case 'Python':
+            return ['python --version', 'pip --version', 'pip install -r requirements.txt', 'python -m venv .venv', 'pytest'];
+        default:
+            return ['git status', 'git branch', 'git log --oneline -n 20', 'git fetch --all', 'git pull', 'git push'];
+    }
+}
 export function registerGitIpc() {
+    ipcMain.handle('app:open-external', async (_event, url) => {
+        const u = (url || '').trim();
+        if (!u)
+            return false;
+        await shell.openExternal(u);
+        return true;
+    });
     ipcMain.handle('repo:pick', async () => {
         const result = await dialog.showOpenDialog({
             properties: ['openDirectory'],
@@ -345,6 +570,12 @@ export function registerGitIpc() {
         await addRemote(repoPath, name, url);
         return true;
     });
+    ipcMain.handle('git:author-get', async () => {
+        return await getGitAuthor();
+    });
+    ipcMain.handle('git:author-set', async (_event, name, email) => {
+        return await setGitAuthor(name, email);
+    });
     ipcMain.handle('repo:fetch', async (_event, repoPath) => {
         if (!repoPath)
             throw new Error('repoPath is required');
@@ -388,7 +619,22 @@ export function registerGitIpc() {
     ipcMain.handle('terminal:run', async (_event, repoPath, command) => {
         if (!repoPath)
             throw new Error('repoPath is required');
+        addTerminalHistoryItem(command);
         return await runTerminal(repoPath, command);
+    });
+    ipcMain.handle('terminal:history-get', async () => {
+        return readTerminalHistory();
+    });
+    ipcMain.handle('terminal:history-add', async (_event, command) => {
+        return addTerminalHistoryItem(command);
+    });
+    ipcMain.handle('terminal:detect-project', async (_event, repoPath) => {
+        if (!repoPath)
+            throw new Error('repoPath is required');
+        return detectProjectType(repoPath);
+    });
+    ipcMain.handle('terminal:suggestions', async (_event, projectType) => {
+        return getTerminalSuggestions(projectType);
     });
     ipcMain.handle('app:info', async () => {
         return {
@@ -484,5 +730,48 @@ export function registerGitIpc() {
         if (!repoPath)
             throw new Error('repoPath is required');
         return await pushBranch(repoPath, branch);
+    });
+    // Merge conflict resolution IPC handlers
+    ipcMain.handle('repo:parse-conflict', async (_event, repoPath, filePath) => {
+        if (!repoPath)
+            throw new Error('repoPath is required');
+        return await parseConflictFile(repoPath, filePath);
+    });
+    ipcMain.handle('repo:resolve-conflict', async (_event, repoPath, filePath, side) => {
+        if (!repoPath)
+            throw new Error('repoPath is required');
+        return await resolveConflict(repoPath, filePath, side);
+    });
+    ipcMain.handle('repo:mark-resolved', async (_event, repoPath, filePath) => {
+        if (!repoPath)
+            throw new Error('repoPath is required');
+        return await markResolved(repoPath, filePath);
+    });
+    ipcMain.handle('repo:open-external', async (_event, filePath) => {
+        if (!filePath)
+            throw new Error('filePath is required');
+        try {
+            await shell.openPath(filePath);
+            return true;
+        }
+        catch {
+            return false;
+        }
+    });
+    // Interactive rebase IPC handlers
+    ipcMain.handle('rebase:load-commits', async (_event, repoPath, baseCommit) => {
+        if (!repoPath)
+            throw new Error('repoPath is required');
+        return await loadRebaseCommits(repoPath, baseCommit);
+    });
+    ipcMain.handle('rebase:start', async (_event, repoPath, todoItems) => {
+        if (!repoPath)
+            throw new Error('repoPath is required');
+        return await startInteractiveRebase(repoPath, todoItems);
+    });
+    ipcMain.handle('rebase:write-todo', async (_event, repoPath, todoItems) => {
+        if (!repoPath)
+            throw new Error('repoPath is required');
+        return await writeRebaseTodoFile(repoPath, todoItems);
     });
 }

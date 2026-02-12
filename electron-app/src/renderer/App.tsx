@@ -1,4 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type KeyboardEvent } from 'react'
+import { DebugMonitor } from './components/DebugMonitor'
+import { MergeResolver } from './components/MergeResolver'
+import { RebaseUI } from './components/RebaseUI'
+import { DiffViewer } from './components/DiffViewer'
 
 type AppTab =
   | 'Status & Commit'
@@ -71,6 +75,11 @@ export function App() {
   const [termBusy, setTermBusy] = useState(false)
   const [termCommand, setTermCommand] = useState('git status')
   const [termResult, setTermResult] = useState<{ code: number | null; stdout: string; stderr: string } | null>(null)
+  const [termProjectType, setTermProjectType] = useState<'Laravel' | 'Node.js' | 'Python' | 'General'>('General')
+  const [termSuggestionsEnabled, setTermSuggestionsEnabled] = useState(true)
+  const [termSuggestions, setTermSuggestions] = useState<string[]>([])
+  const [termHistory, setTermHistory] = useState<string[]>([])
+  const [termHistoryIndex, setTermHistoryIndex] = useState(-1)
   const [debugBusy, setDebugBusy] = useState(false)
   const [appInfo, setAppInfo] = useState<{ platform: string; arch: string; versions: Record<string, string> } | null>(null)
   const [dvMode, setDvMode] = useState<'staged' | 'unstaged'>('unstaged')
@@ -104,6 +113,103 @@ export function App() {
   const [showSwitchBranchDialog, setShowSwitchBranchDialog] = useState(false)
   const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false)
   const [showGitAuthorDialog, setShowGitAuthorDialog] = useState(false)
+  const [showSyncDialog, setShowSyncDialog] = useState(false)
+  const [syncStep, setSyncStep] = useState(0)
+  const [syncSteps] = useState([
+    'Stage all changes',
+    'Commit with message',
+    'Push current branch',
+    'Switch to main',
+    'Merge feature branch',
+    'Push main',
+    'Pull latest',
+    'Switch back to original branch'
+  ])
+
+  const [authorBusy, setAuthorBusy] = useState(false)
+  const [authorName, setAuthorName] = useState('')
+  const [authorEmail, setAuthorEmail] = useState('')
+
+  const openGitAuthorDialog = async () => {
+    setError(null)
+    setShowGitAuthorDialog(true)
+    setAuthorBusy(true)
+    try {
+      const a = await window.devxflow.getGitAuthor()
+      setAuthorName(a.name || '')
+      setAuthorEmail(a.email || '')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAuthorBusy(false)
+    }
+  }
+
+  const renderTextWithLinks = (text: string) => {
+    const urlRe = /(https?:\/\/[^\s]+)/g
+    const parts: (string | { url: string })[] = []
+
+    let lastIndex = 0
+    for (const m of text.matchAll(urlRe)) {
+      const url = m[0]
+      const index = m.index ?? 0
+      if (index > lastIndex) parts.push(text.slice(lastIndex, index))
+      parts.push({ url })
+      lastIndex = index + url.length
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+
+    return parts.map((p, i) => {
+      if (typeof p === 'string') return <span key={i}>{p}</span>
+      return (
+        <a
+          key={i}
+          href={p.url}
+          onClick={(e) => {
+            e.preventDefault()
+            void window.devxflow.openExternal(p.url)
+          }}
+          className="term-link"
+        >
+          {p.url}
+        </a>
+      )
+    })
+  }
+
+  const renderTerminalOutput = () => {
+    if (!termResult) return 'Run a command to see output.'
+
+    const blocks: { label: string; text: string }[] = []
+    if (termResult.stdout) blocks.push({ label: 'stdout', text: termResult.stdout })
+    if (termResult.stderr) blocks.push({ label: 'stderr', text: termResult.stderr })
+
+    if (blocks.length === 0) return '(no output)'
+
+    return (
+      <>
+        {blocks.map((b) => (
+          <div key={b.label}>
+            <div className="term-section-label">{`--- ${b.label} ---`}</div>
+            <div className="term-section-body">{renderTextWithLinks(b.text)}</div>
+          </div>
+        ))}
+      </>
+    )
+  }
+
+  const saveGitAuthor = async () => {
+    setError(null)
+    setAuthorBusy(true)
+    try {
+      await window.devxflow.setGitAuthor(authorName, authorEmail)
+      setShowGitAuthorDialog(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAuthorBusy(false)
+    }
+  }
 
   const normalizeStashIndex = () => {
     if (stashIndex === '') return undefined
@@ -342,12 +448,61 @@ const runStashAction = async (action: () => Promise<string>) => {
     setError(null)
     setTermBusy(true)
     try {
+      await window.devxflow.addTerminalHistory(termCommand)
       const res = await window.devxflow.runTerminal(repoPath, termCommand)
       setTermResult(res)
+      const h = await window.devxflow.getTerminalHistory()
+      setTermHistory(h)
+      setTermHistoryIndex(-1)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setTermBusy(false)
+    }
+  }
+
+  const initTerminal = async () => {
+    if (!repoPath) return
+    setError(null)
+    setTermBusy(true)
+    try {
+      const pt = await window.devxflow.detectProjectType(repoPath)
+      setTermProjectType(pt)
+      const sugg = await window.devxflow.getTerminalSuggestions(pt)
+      setTermSuggestions(sugg)
+      const h = await window.devxflow.getTerminalHistory()
+      setTermHistory(h)
+      setTermHistoryIndex(-1)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setTermBusy(false)
+    }
+  }
+
+  const handleTerminalKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void runTerminal()
+      return
+    }
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    if (termHistory.length === 0) return
+    e.preventDefault()
+
+    if (e.key === 'ArrowUp') {
+      const nextIndex = Math.min(termHistoryIndex + 1, termHistory.length - 1)
+      setTermHistoryIndex(nextIndex)
+      setTermCommand(termHistory[nextIndex] || '')
+      return
+    }
+
+    const nextIndex = Math.max(termHistoryIndex - 1, -1)
+    setTermHistoryIndex(nextIndex)
+    if (nextIndex === -1) {
+      setTermCommand('')
+    } else {
+      setTermCommand(termHistory[nextIndex] || '')
     }
   }
 
@@ -541,29 +696,46 @@ const runStashAction = async (action: () => Promise<string>) => {
   const handleSyncToMain = async () => {
     if (!repoPath || !status) return
     setError(null)
+    setShowSyncDialog(true)
+    setSyncStep(0)
+  }
+
+  const executeSyncToMain = async () => {
+    if (!repoPath || !status) return
+    setError(null)
     try {
-      // Stage all changes
+      // Step 1: Stage all changes
+      setSyncStep(1)
       await window.devxflow.stageAll(repoPath)
-      // Commit with current message
+      // Step 2: Commit with current message
+      setSyncStep(2)
       if (commitMessage.trim()) {
         await window.devxflow.commit(repoPath, commitMessage)
       }
-      // Push current branch
+      // Step 3: Push current branch
+      setSyncStep(3)
       await window.devxflow.push(repoPath, status.branch)
-      // Switch to main
+      // Step 4: Switch to main
+      setSyncStep(4)
       await window.devxflow.switchBranch(repoPath, 'main')
-      // Merge feature branch
+      // Step 5: Merge feature branch
+      setSyncStep(5)
       await window.devxflow.merge(repoPath, status.branch)
-      // Push main
+      // Step 6: Push main
+      setSyncStep(6)
       await window.devxflow.push(repoPath, 'main')
-      // Pull latest
+      // Step 7: Pull latest
+      setSyncStep(7)
       await window.devxflow.pull(repoPath, 'merge')
-      // Switch back to original branch
+      // Step 8: Switch back to original branch
+      setSyncStep(8)
       await window.devxflow.switchBranch(repoPath, status.branch)
       setCommitMessage('')
       await refreshStatus(repoPath)
+      setShowSyncDialog(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      setShowSyncDialog(false)
     }
   }
 
@@ -655,7 +827,10 @@ const runStashAction = async (action: () => Promise<string>) => {
               key={t}
               type="button"
               className={t === activeTab ? 'tab tab-active' : 'tab'}
-              onClick={() => setActiveTab(t)}
+              onClick={() => {
+                setActiveTab(t)
+                if (t === 'Terminal') void initTerminal()
+              }}
             >
               {t}
             </button>
@@ -677,7 +852,7 @@ const runStashAction = async (action: () => Promise<string>) => {
                 <button type="button" className="btn btn-danger" onClick={() => setShowDeleteBranchDialog(true)}>
                   Delete
                 </button>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowGitAuthorDialog(true)}>
+                <button type="button" className="btn btn-secondary" onClick={() => void openGitAuthorDialog()}>
                   Author
                 </button>
                 <button type="button" className="btn btn-secondary btn-refresh" onClick={() => refreshStatus(repoPath)} disabled={!repoPath}>
@@ -974,10 +1149,43 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
               <div className="terminal-grid">
                 <div className="terminal-toolbar">
                   <div className="commit-label">Terminal</div>
+                  <select
+                    className="commit-input"
+                    aria-label="Project Type"
+                    value={termProjectType}
+                    onChange={async (e) => {
+                      const pt = e.target.value as typeof termProjectType
+                      setTermProjectType(pt)
+                      try {
+                        const sugg = await window.devxflow.getTerminalSuggestions(pt)
+                        setTermSuggestions(sugg)
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    disabled={termBusy}
+                  >
+                    <option value="Laravel">Laravel</option>
+                    <option value="Node.js">Node.js</option>
+                    <option value="Python">Python</option>
+                    <option value="General">General</option>
+                  </select>
+                  <button type="button" className="btn" onClick={() => void initTerminal()} disabled={termBusy || !repoPath}>
+                    Detect
+                  </button>
+                  <button
+                    type="button"
+                    className={termSuggestionsEnabled ? 'btn btn-primary' : 'btn'}
+                    onClick={() => setTermSuggestionsEnabled((v) => !v)}
+                    disabled={termBusy}
+                  >
+                    Suggestions
+                  </button>
                   <input
                     className="commit-input"
                     value={termCommand}
                     onChange={(e) => setTermCommand(e.target.value)}
+                    onKeyDown={handleTerminalKeyDown}
                     placeholder="command"
                   />
                   <button type="button" className="btn btn-primary" onClick={runTerminal} disabled={termBusy || !repoPath}>
@@ -985,12 +1193,29 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </button>
                 </div>
 
+                {termSuggestionsEnabled && termSuggestions.length > 0 ? (
+                  <div className="diff-panel" aria-label="Terminal suggestions">
+                    <div className="diff-title">Suggestions</div>
+                    <div className="stash-list">
+                      {termSuggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          className="history-item"
+                          onClick={() => setTermCommand(s)}
+                          disabled={termBusy}
+                        >
+                          <div className="history-msg">{s}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="diff-panel" aria-label="Terminal output">
                   <div className="diff-title">Output {termResult ? `(code: ${String(termResult.code)})` : ''}</div>
                   <pre className="diff-body">
-                    {termResult
-                      ? `${termResult.stdout}${termResult.stderr ? `\n--- stderr ---\n${termResult.stderr}` : ''}`
-                      : 'Run a command to see output.'}
+                    {renderTerminalOutput()}
                   </pre>
                 </div>
 
@@ -998,192 +1223,44 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                 <div className="panel-hint">Terminal baseline: run one command in repo cwd and capture stdout/stderr.</div>
               </div>
             ) : activeTab === 'Debug' ? (
-              <div className="debug-grid">
-                <div className="debug-toolbar">
-                  <div className="commit-label">Debug</div>
-                  <button type="button" className="btn btn-primary" onClick={refreshDebugInfo} disabled={debugBusy}>
-                    {debugBusy ? 'Loading…' : 'Refresh'}
-                  </button>
-                </div>
-
-                <div className="diff-panel" aria-label="Debug info">
-                  <div className="diff-title">App / Repo Diagnostics</div>
-                  <pre className="diff-body">
-                    {JSON.stringify(
-                      {
-                        repoPath,
-                        activeTab,
-                        status,
-                        appInfo,
-                      },
-                      null,
-                      2
-                    )}
-                  </pre>
-                </div>
-
-                {error ? <div className="panel-error">{error}</div> : null}
-                <div className="panel-hint">Debug baseline: app versions + current repo state snapshot.</div>
+              <div style={{ height: '100%', padding: '16px' }}>
+                <DebugMonitor repoPath={repoPath} />
               </div>
             ) : activeTab === 'Diff Viewer' ? (
-              <div className="dv-grid">
-                <div className="dv-toolbar">
-                  <div className="commit-label">Diff Viewer</div>
-                  <input
-                    className="commit-input"
-                    value={dvQuery}
-                    onChange={(e) => setDvQuery(e.target.value)}
-                    placeholder={`Filter files (${dvCounts.total})`}
-                  />
-                  <button
-                    type="button"
-                    className={dvMode === 'unstaged' ? 'btn btn-primary' : 'btn'}
-                    onClick={() => {
-                      setDvMode('unstaged')
-                      if (dvFile) void openDiffViewerFile(dvFile, 'unstaged')
-                    }}
-                    disabled={dvBusy}
-                  >
-                    Unstaged ({dvCounts.unstaged})
-                  </button>
-                  <button
-                    type="button"
-                    className={dvMode === 'staged' ? 'btn btn-primary' : 'btn'}
-                    onClick={() => {
-                      setDvMode('staged')
-                      if (dvFile) void openDiffViewerFile(dvFile, 'staged')
-                    }}
-                    disabled={dvBusy}
-                  >
-                    Staged ({dvCounts.staged})
-                  </button>
-                  <button type="button" className="btn" onClick={() => repoPath && void refreshStatus(repoPath)} disabled={!repoPath}>
-                    Refresh Status
-                  </button>
-                </div>
-
-                <div className="dv-split">
-                  <div className="dv-list" aria-label="Files">
-                    {dvFiltered.length === 0 ? (
-                      <div className="changes-empty">No changes loaded. Click Refresh Status.</div>
-                    ) : (
-                      dvFiltered.map((c) => (
-                        <button
-                          key={c.path}
-                          type="button"
-                          className={c.path === dvFile ? 'history-item history-item-active' : 'history-item'}
-                          onClick={() => void openDiffViewerFile(c.path, dvMode)}
-                        >
-                          <div className="history-msg">
-                            <span className={c.index.trim() && c.index !== '?' ? 'dv-badge dv-badge-staged' : 'dv-badge dv-badge-none'}>
-                              {c.index.trim() && c.index !== '?' ? 'STAGED' : '—'}
-                            </span>
-                            <span className={c.working_dir.trim() && c.working_dir !== ' ' ? 'dv-badge dv-badge-unstaged' : 'dv-badge dv-badge-none'}>
-                              {c.working_dir.trim() && c.working_dir !== ' ' ? 'UNSTAGED' : '—'}
-                            </span>
-                            <span className="dv-path">{c.path}</span>
-                          </div>
-                          <div className="history-meta">
-                            <span className="history-hash">{c.index.trim() || ' '}</span>
-                            <span className="history-date">{c.working_dir.trim() || ' '}</span>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="diff-panel" aria-label="Diff">
-                    <div className="diff-title">
-                      {dvFile ? `${dvMode === 'staged' ? 'Staged' : 'Unstaged'}: ${dvFile}` : 'Diff'}
-                    </div>
-                    <pre className="diff-body">{dvBusy ? 'Loading…' : dvDiff || 'Select a file to view diff.'}</pre>
-                  </div>
-                </div>
-
-                {error ? <div className="panel-error">{error}</div> : null}
-                <div className="panel-hint">Diff Viewer baseline: select file and view staged/unstaged diff.</div>
+              <div style={{ height: '100%', padding: '16px' }}>
+                <DiffViewer
+                  repoPath={repoPath}
+                  changes={changes}
+                  onRefresh={() => repoPath && void refreshStatus(repoPath)}
+                  getDiff={async (filePath, leftRef, rightRef) => {
+                    if (!repoPath) return ''
+                    // Use the existing getDiff IPC - rightRef indicates staged mode
+                    const mode = rightRef === '--cached' ? 'staged' : 'unstaged'
+                    return await window.devxflow.getDiff(repoPath, filePath, mode)
+                  }}
+                  isLoading={dvBusy}
+                />
               </div>
             ) : activeTab === 'Merge Resolver' ? (
-              <div className="mr-grid">
-                <div className="mr-toolbar">
-                  <div className="commit-label">Merge</div>
-                  <button type="button" className="btn btn-primary" onClick={refreshMergeResolver} disabled={mrBusy || !repoPath}>
-                    {mrBusy ? 'Loading…' : 'Refresh Conflicts'}
-                  </button>
-                  <button type="button" className={mrStage === 1 ? 'btn btn-primary' : 'btn'} onClick={() => mrActive && void openMergeFile(mrActive, 1)} disabled={mrBusy || !mrActive}>
-                    Base
-                  </button>
-                  <button type="button" className={mrStage === 2 ? 'btn btn-primary' : 'btn'} onClick={() => mrActive && void openMergeFile(mrActive, 2)} disabled={mrBusy || !mrActive}>
-                    Ours
-                  </button>
-                  <button type="button" className={mrStage === 3 ? 'btn btn-primary' : 'btn'} onClick={() => mrActive && void openMergeFile(mrActive, 3)} disabled={mrBusy || !mrActive}>
-                    Theirs
-                  </button>
-                </div>
-
-                <div className="mr-split">
-                  <div className="dv-list" aria-label="Conflicted files">
-                    {mrFiles.length === 0 ? (
-                      <div className="changes-empty">No conflicts detected.</div>
-                    ) : (
-                      mrFiles.map((f) => (
-                        <button
-                          key={f}
-                          type="button"
-                          className={f === mrActive ? 'history-item history-item-active' : 'history-item'}
-                          onClick={() => void openMergeFile(f, mrStage)}
-                        >
-                          <div className="history-msg">{f}</div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="diff-panel" aria-label="Conflict content">
-                    <div className="diff-title">{mrActive ? `${mrActive} (${mrStage === 1 ? 'BASE' : mrStage === 2 ? 'OURS' : 'THEIRS'})` : 'Conflict'}</div>
-                    <pre className="diff-body">{mrBusy ? 'Loading…' : mrContent || 'Select a conflicted file.'}</pre>
-                  </div>
-                </div>
-
-                {error ? <div className="panel-error">{error}</div> : null}
-                <div className="panel-hint">Merge Resolver baseline: list conflicted files and inspect base/ours/theirs.</div>
+              <div style={{ height: '100%', padding: '16px' }}>
+                <MergeResolver
+                  repoPath={repoPath}
+                  conflictedFiles={mrFiles}
+                  onRefresh={() => repoPath && void refreshMergeResolver()}
+                  isLoading={mrBusy}
+                />
               </div>
             ) : activeTab === 'Rebase' ? (
-              <div className="rb-grid">
-                <div className="mr-toolbar">
-                  <div className="commit-label">Rebase</div>
-                  <button type="button" className="btn btn-primary" onClick={refreshRebase} disabled={rbBusy || !repoPath}>
-                    {rbBusy ? 'Loading…' : 'Refresh'}
-                  </button>
-                  <button type="button" className="btn" onClick={() => void runRebaseAction('continue')} disabled={rbBusy || !rbStatus?.inProgress}>
-                    Continue
-                  </button>
-                  <button type="button" className="btn" onClick={() => void runRebaseAction('skip')} disabled={rbBusy || !rbStatus?.inProgress}>
-                    Skip
-                  </button>
-                  <button type="button" className="btn" onClick={() => void runRebaseAction('abort')} disabled={rbBusy || !rbStatus?.inProgress}>
-                    Abort
-                  </button>
-                </div>
-
-                <div className="mr-split">
-                  <div className="diff-panel" aria-label="Rebase status">
-                    <div className="diff-title">Status</div>
-                    <pre className="diff-body">
-                      {rbStatus
-                        ? JSON.stringify(rbStatus, null, 2)
-                        : 'Click Refresh to load rebase status.'}
-                    </pre>
-                  </div>
-
-                  <div className="diff-panel" aria-label="Rebase output">
-                    <div className="diff-title">Output</div>
-                    <pre className="diff-body">{rbOutput || 'Run Continue/Skip/Abort to see output.'}</pre>
-                  </div>
-                </div>
-
-                {error ? <div className="panel-error">{error}</div> : null}
-                <div className="panel-hint">Rebase baseline: detect in-progress rebase and run continue/skip/abort.</div>
+              <div style={{ height: '100%', padding: '16px' }}>
+                <RebaseUI
+                  repoPath={repoPath}
+                  rebaseStatus={rbStatus}
+                  onRefresh={() => repoPath && void refreshRebase()}
+                  onContinue={() => void runRebaseAction('continue')}
+                  onSkip={() => void runRebaseAction('skip')}
+                  onAbort={() => void runRebaseAction('abort')}
+                  isLoading={rbBusy}
+                />
               </div>
             ) : activeTab === 'Database' ? (
               <div className="db-grid">
@@ -1231,7 +1308,135 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
               </div>
             )}
           </div>
-        </div>
       </div>
+
+      {showGitAuthorDialog ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Git Author">
+          <div className="modal">
+            <div className="modal-title">Git Author</div>
+            <div className="modal-body">
+              <label className="modal-label" htmlFor="author-name">
+                Name
+              </label>
+              <input
+                id="author-name"
+                className="commit-input"
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
+                placeholder="Your Name"
+                disabled={authorBusy}
+              />
+              <label className="modal-label" htmlFor="author-email">
+                Email
+              </label>
+              <input
+                id="author-email"
+                className="commit-input"
+                value={authorEmail}
+                onChange={(e) => setAuthorEmail(e.target.value)}
+                placeholder="you@example.com"
+                disabled={authorBusy}
+              />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setShowGitAuthorDialog(false)} disabled={authorBusy}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => void saveGitAuthor()} disabled={authorBusy}>
+                {authorBusy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showSyncDialog ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Sync to Main">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-title">Sync to Main Workflow</div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '16px', color: '#888888' }}>
+                This will execute the following steps to sync your feature branch to main:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {syncSteps.map((step, index) => (
+                  <div
+                    key={step}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '8px 12px',
+                      borderRadius: '4px',
+                      background: syncStep === 0 ? 'transparent' : syncStep > index ? 'rgba(0, 255, 136, 0.1)' : syncStep === index + 1 ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
+                      border: syncStep === index + 1 ? '1px solid var(--accent)' : '1px solid transparent',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background: syncStep > index + 1 ? 'var(--success)' : syncStep === index + 1 ? 'var(--accent)' : 'var(--panel)',
+                        color: syncStep > index + 1 || syncStep === index + 1 ? '#000' : '#888',
+                      }}
+                    >
+                      {syncStep > index + 1 ? '✓' : index + 1}
+                    </span>
+                    <span style={{ color: syncStep === index + 1 ? 'var(--text)' : '#888' }}>{step}</span>
+                  </div>
+                ))}
+              </div>
+              {syncStep > 0 && (
+                <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      background: 'var(--panel)',
+                      borderRadius: '2px',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${(syncStep / syncSteps.length) * 100}%`,
+                        height: '100%',
+                        background: 'var(--accent)',
+                        transition: 'width 0.3s ease',
+                      }}
+                    />
+                  </div>
+                  <p style={{ marginTop: '8px', color: 'var(--accent)', fontSize: '12px' }}>
+                    Step {syncStep} of {syncSteps.length}: {syncSteps[syncStep - 1]}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              {syncStep === 0 ? (
+                <>
+                  <button type="button" className="btn" onClick={() => setShowSyncDialog(false)}>
+                    Cancel
+                  </button>
+                  <button type="button" className="btn btn-success" onClick={() => void executeSyncToMain()}>
+                    Start Sync
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn" onClick={() => setShowSyncDialog(false)} disabled={syncStep > 0 && syncStep < syncSteps.length}>
+                  {syncStep >= syncSteps.length ? 'Close' : 'Running...'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }

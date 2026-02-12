@@ -4,6 +4,7 @@ declare global {
   interface Window {
     devxflow: {
       version: string
+      openExternal: (url: string) => Promise<boolean>
       pickRepo: () => Promise<string | null>
       getRepoStatus: (repoPath: string) => Promise<{
         branch: string
@@ -52,6 +53,8 @@ declare global {
       stageAll: (repoPath: string) => Promise<boolean>
       switchBranch: (repoPath: string, branch: string) => Promise<boolean>
       merge: (repoPath: string, branch: string) => Promise<boolean>
+      getGitAuthor: () => Promise<{ name: string; email: string }>
+      setGitAuthor: (name: string, email: string) => Promise<boolean>
       getStashes: (repoPath: string) => Promise<
         {
           index: number
@@ -70,6 +73,10 @@ declare global {
         stdout: string
         stderr: string
       }>
+      getTerminalHistory: () => Promise<string[]>
+      addTerminalHistory: (command: string) => Promise<boolean>
+      detectProjectType: (repoPath: string) => Promise<'Laravel' | 'Node.js' | 'Python' | 'General'>
+      getTerminalSuggestions: (projectType: 'Laravel' | 'Node.js' | 'Python' | 'General') => Promise<string[]>
       getAppInfo: () => Promise<{
         platform: string
         arch: string
@@ -94,6 +101,42 @@ declare global {
       queryDb: (dbPath: string, sql: string) => Promise<{ rows: unknown[] }>
       execDb: (dbPath: string, sql: string) => Promise<{ ok: boolean }>
       closeDb: (dbPath: string) => Promise<boolean>
+      // Debug / Laravel Log Monitor APIs
+      debugDetectLog: (repoPath: string) => Promise<string | null>
+      debugReadLog: (repoPath: string) => Promise<{
+        lines: { text: string; level: 'error' | 'warning' | 'info' | 'debug' | 'timestamp' | 'other' }[]
+        summary: { errors: number; warnings: number; info: number; debug: number; total: number }
+        filePath: string | null
+        truncated: boolean
+      }>
+      debugWatchStart: (repoPath: string) => Promise<{ success: boolean; filePath: string | null }>
+      debugWatchStop: (repoPath: string) => Promise<boolean>
+      debugOpenLog: (filePath: string) => Promise<boolean>
+      onDebugUpdate: (callback: (result: {
+        lines: { text: string; level: 'error' | 'warning' | 'info' | 'debug' | 'timestamp' | 'other' }[]
+        summary: { errors: number; warnings: number; info: number; debug: number; total: number }
+        filePath: string | null
+        truncated: boolean
+      }) => void) => (() => void)
+      // Merge conflict resolution APIs
+      parseConflict: (repoPath: string, filePath: string) => Promise<{ base: string; ours: string; theirs: string }>
+      resolveConflict: (repoPath: string, filePath: string, side: 'ours' | 'theirs') => Promise<boolean>
+      markResolved: (repoPath: string, filePath: string) => Promise<boolean>
+      openFileExternal: (filePath: string) => Promise<boolean>
+      // Interactive rebase APIs
+      loadRebaseCommits: (repoPath: string, baseCommit?: string) => Promise<{ action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; hash: string; message: string }[]>
+      startInteractiveRebase: (repoPath: string, todoItems: { action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; hash: string; message: string }[]) => Promise<string>
+      writeRebaseTodo: (repoPath: string, todoItems: { action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; hash: string; message: string }[]) => Promise<boolean>
+      // Database multi-engine APIs
+      dbConnect: (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }) => Promise<{ ok: boolean; key: string; error?: string }>
+      dbDisconnect: (key: string) => Promise<boolean>
+      dbQuery: (key: string, sql: string) => Promise<{ rows: unknown[]; fields?: Array<{ name: string; type: string }> }>
+      dbExecute: (key: string, sql: string) => Promise<boolean>
+      dbListTables: (key: string) => Promise<string[]>
+      dbListDatabases: (key: string) => Promise<string[]>
+      dbTableInfo: (key: string, tableName: string) => Promise<unknown[]>
+      dbPickSqlite: () => Promise<string | null>
+      dbTestConnection: (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }) => Promise<{ ok: boolean; error?: string }>
     }
   }
 }

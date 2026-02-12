@@ -43,6 +43,8 @@ type TerminalResult = {
   stderr: string
 }
 
+type ProjectType = 'Laravel' | 'Node.js' | 'Python' | 'General'
+
 type AppInfo = {
   platform: string
   arch: string
@@ -62,8 +64,38 @@ type DbQueryResult = {
   rows: unknown[]
 }
 
+type LogLevel = 'error' | 'warning' | 'info' | 'debug' | 'timestamp' | 'other'
+
+type LogLine = {
+  text: string
+  level: LogLevel
+}
+
+type LogSummary = {
+  errors: number
+  warnings: number
+  info: number
+  debug: number
+  total: number
+}
+
+type LogResult = {
+  lines: LogLine[]
+  summary: LogSummary
+  filePath: string | null
+  truncated: boolean
+}
+
+type GitAuthor = {
+  name: string
+  email: string
+}
+
 contextBridge.exposeInMainWorld('devxflow', {
   version: '0.1.0',
+  openExternal: async (url: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('app:open-external', url)
+  },
   pickRepo: async (): Promise<string | null> => {
     return await ipcRenderer.invoke('repo:pick')
   },
@@ -121,6 +153,12 @@ contextBridge.exposeInMainWorld('devxflow', {
   merge: async (repoPath: string, branch: string): Promise<boolean> => {
     return await ipcRenderer.invoke('repo:merge', repoPath, branch)
   },
+  getGitAuthor: async (): Promise<GitAuthor> => {
+    return await ipcRenderer.invoke('git:author-get')
+  },
+  setGitAuthor: async (name: string, email: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('git:author-set', name, email)
+  },
   getStashes: async (repoPath: string): Promise<StashItem[]> => {
     return await ipcRenderer.invoke('repo:stash-list', repoPath)
   },
@@ -138,6 +176,18 @@ contextBridge.exposeInMainWorld('devxflow', {
   },
   runTerminal: async (repoPath: string, command: string): Promise<TerminalResult> => {
     return await ipcRenderer.invoke('terminal:run', repoPath, command)
+  },
+  getTerminalHistory: async (): Promise<string[]> => {
+    return await ipcRenderer.invoke('terminal:history-get')
+  },
+  addTerminalHistory: async (command: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('terminal:history-add', command)
+  },
+  detectProjectType: async (repoPath: string): Promise<ProjectType> => {
+    return await ipcRenderer.invoke('terminal:detect-project', repoPath)
+  },
+  getTerminalSuggestions: async (projectType: ProjectType): Promise<string[]> => {
+    return await ipcRenderer.invoke('terminal:suggestions', projectType)
   },
   getAppInfo: async (): Promise<AppInfo> => {
     return await ipcRenderer.invoke('app:info')
@@ -177,5 +227,77 @@ contextBridge.exposeInMainWorld('devxflow', {
   },
   closeDb: async (dbPath: string): Promise<boolean> => {
     return await ipcRenderer.invoke('db:close', dbPath)
+  },
+  // Debug / Laravel Log Monitor APIs
+  debugDetectLog: async (repoPath: string): Promise<string | null> => {
+    return await ipcRenderer.invoke('debug:detect-log', repoPath)
+  },
+  debugReadLog: async (repoPath: string): Promise<LogResult> => {
+    return await ipcRenderer.invoke('debug:read-log', repoPath)
+  },
+  debugWatchStart: async (repoPath: string): Promise<{ success: boolean; filePath: string | null }> => {
+    return await ipcRenderer.invoke('debug:watch-start', repoPath)
+  },
+  debugWatchStop: async (repoPath: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('debug:watch-stop', repoPath)
+  },
+  debugOpenLog: async (filePath: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('debug:open-log', filePath)
+  },
+  onDebugUpdate: (callback: (result: LogResult) => void) => {
+    const handler = (_event: unknown, result: LogResult) => callback(result)
+    ipcRenderer.on('debug:update', handler)
+    return () => ipcRenderer.removeListener('debug:update', handler)
+  },
+  // Merge conflict resolution APIs
+  parseConflict: async (repoPath: string, filePath: string): Promise<{ base: string; ours: string; theirs: string }> => {
+    return await ipcRenderer.invoke('repo:parse-conflict', repoPath, filePath)
+  },
+  resolveConflict: async (repoPath: string, filePath: string, side: 'ours' | 'theirs'): Promise<boolean> => {
+    return await ipcRenderer.invoke('repo:resolve-conflict', repoPath, filePath, side)
+  },
+  markResolved: async (repoPath: string, filePath: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('repo:mark-resolved', repoPath, filePath)
+  },
+  openFileExternal: async (filePath: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('repo:open-external', filePath)
+  },
+  // Interactive rebase APIs
+  loadRebaseCommits: async (repoPath: string, baseCommit?: string): Promise<{ action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; hash: string; message: string }[]> => {
+    return await ipcRenderer.invoke('rebase:load-commits', repoPath, baseCommit)
+  },
+  startInteractiveRebase: async (repoPath: string, todoItems: { action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; hash: string; message: string }[]): Promise<string> => {
+    return await ipcRenderer.invoke('rebase:start', repoPath, todoItems)
+  },
+  writeRebaseTodo: async (repoPath: string, todoItems: { action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; hash: string; message: string }[]): Promise<boolean> => {
+    return await ipcRenderer.invoke('rebase:write-todo', repoPath, todoItems)
+  },
+  // Database multi-engine APIs
+  dbConnect: async (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }): Promise<{ ok: boolean; key: string; error?: string }> => {
+    return await ipcRenderer.invoke('db:connect', config)
+  },
+  dbDisconnect: async (key: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('db:disconnect', key)
+  },
+  dbQuery: async (key: string, sql: string): Promise<{ rows: unknown[]; fields?: Array<{ name: string; type: string }> }> => {
+    return await ipcRenderer.invoke('db:query', key, sql)
+  },
+  dbExecute: async (key: string, sql: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('db:execute', key, sql)
+  },
+  dbListTables: async (key: string): Promise<string[]> => {
+    return await ipcRenderer.invoke('db:list-tables', key)
+  },
+  dbListDatabases: async (key: string): Promise<string[]> => {
+    return await ipcRenderer.invoke('db:list-databases', key)
+  },
+  dbTableInfo: async (key: string, tableName: string): Promise<unknown[]> => {
+    return await ipcRenderer.invoke('db:table-info', key, tableName)
+  },
+  dbPickSqlite: async (): Promise<string | null> => {
+    return await ipcRenderer.invoke('db:pick-sqlite')
+  },
+  dbTestConnection: async (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }): Promise<{ ok: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('db:test-connection', config)
   },
 })

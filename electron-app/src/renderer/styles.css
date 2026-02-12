@@ -1,19 +1,28 @@
 :root {
   color-scheme: dark;
-  /* Python Dev-X-Flow-Pro.py color scheme */
-  --bg: #1e1e1e;
-  --panel: #252526;
-  --panel-2: #1e1e1e;
-  --border: #3e3e42;
-  --text: #d4d4d4;
-  --muted: #888888;
-  --accent: #007acc;
-  --accent-hover: #005f9e;
-  --success: #4ec9b0;
-  --danger: #f44336;
-  --warning: #ffc107;
-  --ring: rgba(0, 122, 204, 0.4);
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  /* Cyberpunk Theme - Based on web showcase */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-panel: #1a1a2e;
+  --accent: #00d4ff;
+  --accent-glow: rgba(0, 212, 255, 0.3);
+  --text-primary: #ffffff;
+  --text-secondary: #8b8b9a;
+  --text-muted: #5a5a6a;
+  --border: rgba(0, 212, 255, 0.2);
+  --success: #00ff88;
+  --warning: #ffaa00;
+  --danger: #ff4757;
+  --ring: rgba(0, 212, 255, 0.4);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --glow: 0 0 20px rgba(0, 212, 255, 0.3);
+  /* Legacy compatibility */
+  --bg: #0a0a0f;
+  --panel: #12121a;
+  --panel-2: #1a1a2e;
+  --text: #ffffff;
+  --muted: #8b8b9a;
+  --accent-hover: #00b8e6;
 }
 
 .db-grid {
@@ -187,6 +196,20 @@
   align-items: center;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.term-link {
+  text-decoration: underline;
+}
+
+.term-section-label {
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.term-section-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 980px) {
@@ -1134,4 +1157,453 @@ body {
 .app-version {
   font-size: 12px;
   color: var(--muted);
+}
+
+/* Component UI Consistency Classes */
+.panel-grid {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--panel);
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+
+.toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.toolbar-icon {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.toolbar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.toolbar-text {
+  color: var(--muted);
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.text-success {
+  color: var(--success);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+}
+
+.text-warning {
+  color: var(--warning);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+}
+
+.panel-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.summary-label {
+  color: var(--muted);
+  font-weight: bold;
+}
+
+.summary-errors {
+  color: var(--danger);
+  font-weight: bold;
+}
+
+.summary-warnings {
+  color: var(--warning);
+  font-weight: bold;
+}
+
+.summary-info {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.summary-debug {
+  color: var(--success);
+  font-weight: bold;
+}
+
+.summary-total {
+  color: var(--muted);
+}
+
+.summary-truncated {
+  color: var(--warning);
+  font-style: italic;
+}
+
+.panel-error-message {
+  padding: 12px;
+  background: rgba(255, 71, 87, 0.2);
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.log-display {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.log-empty {
+  color: var(--muted);
+  text-align: center;
+  padding-top: 40px;
+}
+
+.log-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 1px 4px;
+}
+
+.log-line-error {
+  color: #f48771;
+  background: rgba(244, 135, 113, 0.1);
+}
+
+.log-line-warning {
+  color: #ce9178;
+  background: rgba(206, 145, 120, 0.1);
+}
+
+.log-line-info {
+  color: var(--accent);
+  background: rgba(0, 212, 255, 0.1);
+}
+
+.log-line-debug {
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.1);
+}
+
+.log-line-timestamp {
+  color: var(--muted);
+}
+
+.log-line-other {
+  color: var(--text);
+}
+
+/* Diff Viewer Classes */
+.diff-split {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  min-height: 0;
+}
+
+.diff-file-list {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.diff-panel-header {
+  padding: 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-weight: bold;
+  color: var(--text);
+}
+
+.diff-file-items {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.diff-file-item {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 4px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+}
+
+.diff-file-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.diff-file-item.active {
+  background: var(--accent);
+  color: #000;
+}
+
+.diff-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diff-badge {
+  font-size: 10px;
+}
+
+.diff-badge.staged {
+  color: var(--success);
+}
+
+.diff-badge.unstaged {
+  color: var(--warning);
+}
+
+.diff-file-path {
+  word-break: break-all;
+}
+
+.diff-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.diff-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--bg);
+}
+
+.diff-empty {
+  color: var(--muted);
+  text-align: center;
+  padding-top: 40px;
+}
+
+.diff-line {
+  padding: 1px 8px;
+}
+
+.diff-line-header {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--warning);
+  font-weight: bold;
+}
+
+.diff-line-add {
+  background: rgba(0, 255, 136, 0.1);
+  color: var(--success);
+}
+
+.diff-line-remove {
+  background: rgba(255, 71, 87, 0.1);
+  color: var(--danger);
+}
+
+.diff-line-context {
+  color: var(--text);
+}
+
+.diff-marker {
+  margin-right: 8px;
+}
+
+.diff-marker.add {
+  color: var(--success);
+}
+
+.diff-marker.remove {
+  color: var(--danger);
+}
+
+.diff-marker.context {
+  color: var(--muted);
+}
+
+.diff-linenum {
+  color: var(--muted);
+  margin-right: 8px;
+  min-width: 40px;
+  display: inline-block;
+}
+
+/* MergeResolver Classes */
+.mr-file-list {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mr-content-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mr-view-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.mr-view-title {
+  margin-left: auto;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.mr-content-display {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--bg);
+}
+
+.mr-pre {
+  margin: 0;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.mr-action-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.panel-success-message {
+  padding: 12px;
+  background: rgba(0, 255, 136, 0.2);
+  border: 1px solid var(--success);
+  border-radius: 4px;
+  color: var(--success);
+  font-size: 13px;
+}
+
+/* RebaseUI Classes */
+.rebase-commits-list {
+  flex: 1;
+  overflow: auto;
+  background: var(--panel);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.rebase-commits-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rebase-commit-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--bg);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.rebase-commit-item.drop {
+  background: rgba(255, 71, 87, 0.1);
+  border-color: var(--danger);
+}
+
+.rebase-commit-index {
+  color: var(--muted);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 12px;
+  min-width: 30px;
+}
+
+.rebase-action-select {
+  padding: 4px 8px;
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.rebase-action-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rebase-commit-message {
+  color: var(--text);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 12px;
+  flex: 1;
+}
+
+.rebase-commit-message.drop {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.rebase-commit-hash {
+  color: var(--accent);
 }
