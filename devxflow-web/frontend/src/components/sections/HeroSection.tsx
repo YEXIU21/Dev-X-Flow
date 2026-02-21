@@ -74,13 +74,13 @@ export function HeroSection() {
           <span className="glitch" data-text="Ship.">Ship.</span>
         </h1>
         <div className="typing-text">{typingText}</div>
-        
+
         <div className="terminal-window">
           <div className="terminal-header">
             <div className="terminal-dot red"></div>
             <div className="terminal-dot yellow"></div>
             <div className="terminal-dot green"></div>
-            <h1 className="hero-title">Dev-X-Flow</h1> --version
+            <div className="terminal-title">Dev-X-Flow --version</div>
           </div>
           <div className="terminal-body">
             <div className="terminal-line">
