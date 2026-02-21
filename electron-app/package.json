@@ -10,7 +10,25 @@
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
     "build": "npm run build:main && npm run build:renderer",
-    "start": "electron ."
+    "start": "electron .",
+    "package": "npm run build && electron-builder build --win --dir",
+    "dist": "npm run build && electron-builder build --win"
+  },
+  "build": {
+    "appId": "com.devxflow.pro",
+    "productName": "DevXFlowPro",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist-main/**/*",
+      "dist-renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "public/icon.ico"
+    }
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",

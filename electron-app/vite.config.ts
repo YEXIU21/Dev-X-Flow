@@ -7,6 +7,7 @@ const rootDir = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
+  base: './',
   root: resolve(rootDir, 'src/renderer'),
   build: {
     outDir: resolve(rootDir, 'dist-renderer'),
