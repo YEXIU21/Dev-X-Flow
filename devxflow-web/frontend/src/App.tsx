@@ -10,6 +10,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ContactPage } from './pages/ContactPage'
 import { PaymentPage } from './pages/PaymentPage'
+import { DownloadPage } from './pages/DownloadPage'
 
 // Placeholder pages - to be implemented
 function PricingPage() {

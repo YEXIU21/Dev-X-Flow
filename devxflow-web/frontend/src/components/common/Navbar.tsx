@@ -8,7 +8,7 @@ export function Navbar() {
         className="logo"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       >
-        Dev-X-Flow-Pro
+        Dev-X-Flow
       </Link>
       <div className="nav-links">
         <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
@@ -17,7 +17,6 @@ export function Navbar() {
         <Link to="/#features">Features</Link>
         <Link to="/#showcase">Showcase</Link>
         <Link to="/#pricing">Pricing</Link>
-        <Link to="/" className="logo">Dev-X-Flow</Link>
         <Link to="/download">Download</Link>
         <Link to="/contact">Contact</Link>
         <Link to="/login">Login</Link>
