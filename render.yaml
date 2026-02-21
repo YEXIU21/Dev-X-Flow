@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: devxflow-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    rootDir: devxflow-web/backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        fromConfig: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DESKTOP_API_KEY
+        generateValue: true

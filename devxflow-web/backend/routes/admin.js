@@ -4,8 +4,9 @@ const auth = require('./auth');
 
 const router = express.Router();
 
-// All admin routes require authentication
+// All admin routes require authentication and admin role
 router.use(auth.verifyToken);
+router.use(auth.isAdmin);
 
 // Get dashboard stats
 router.get('/stats', async (req, res) => {
@@ -215,7 +216,7 @@ router.post('/license/:id/reset', async (req, res) => {
 router.post('/change-password', async (req, res) => {
     try {
         const { current_password, new_password } = req.body;
-        const adminId = req.admin.adminId;
+        const adminId = req.user.adminId; // Updated from req.admin.adminId
 
         // Get current admin using Mongoose
         const admin = await models.Admin.findById(adminId);
@@ -243,6 +244,47 @@ router.post('/change-password', async (req, res) => {
     } catch (error) {
         console.error('Change password error:', error);
         res.status(500).json({ error: 'Failed to change password' });
+    }
+});
+
+// List all users (Admins and Customers)
+router.get('/users', async (req, res) => {
+    try {
+        const admins = await models.Admin.find({}, '-password_hash').lean();
+        const customers = await models.Customer.find({}, '-password_hash').lean();
+        
+        res.json({
+            success: true,
+            users: {
+                admins: admins.map(a => ({ ...a, role: 'admin' })),
+                customers: customers.map(c => ({ ...c, role: 'customer' }))
+            }
+        });
+    } catch (error) {
+        console.error('Get users error:', error);
+        res.status(500).json({ error: 'Failed to get users' });
+    }
+});
+
+// Create a new user (Admin or Customer)
+router.post('/users/create', async (req, res) => {
+    try {
+        const { username, email, password, role } = req.body;
+        const bcrypt = require('bcryptjs');
+        const password_hash = await bcrypt.hash(password, 10);
+
+        if (role === 'admin') {
+            const admin = new models.Admin({ username, password_hash });
+            await admin.save();
+        } else {
+            const customer = new models.Customer({ email, password_hash, full_name: username });
+            await customer.save();
+        }
+
+        res.json({ success: true, message: `User created successfully as ${role}` });
+    } catch (error) {
+        console.error('Create user error:', error);
+        res.status(500).json({ error: 'Failed to create user' });
     }
 });
 
