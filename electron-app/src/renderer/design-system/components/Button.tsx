@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes } from 'react'
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'ai-prominent' | 'sync'
 
 type ButtonSize = 'sm' | 'md'
 

@@ -127,7 +127,7 @@ export function DiffViewer({ repoPath, changes, onRefresh, getDiff, isLoading }:
   return (
     <div className="panel-grid">
       {/* Toolbar */}
-      <div className="panel-toolbar">
+      <div className="working-tree-toolbar">
         <span className="toolbar-label">Compare:</span>
 
         <select

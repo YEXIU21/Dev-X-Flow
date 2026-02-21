@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 type ModalProps = {
   open: boolean
@@ -22,7 +23,7 @@ export function Modal({ open, title, ariaLabel, onClose, children, actions, clas
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       className="modal-overlay"
       role="dialog"
@@ -37,6 +38,7 @@ export function Modal({ open, title, ariaLabel, onClose, children, actions, clas
         <div className="modal-body">{children}</div>
         {actions ? <div className="modal-actions">{actions}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

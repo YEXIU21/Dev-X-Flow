@@ -160,7 +160,7 @@ export function DebugMonitor({ repoPath }: DebugMonitorProps) {
   return (
     <div className="panel-grid">
       {/* Controls */}
-      <div className="panel-toolbar">
+      <div className="working-tree-toolbar">
         {/* File info */}
         <div className="toolbar-info">
           <span className="toolbar-icon">

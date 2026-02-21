@@ -105,7 +105,7 @@ export function RebaseUI({ repoPath, rebaseStatus, onRefresh, onContinue, onSkip
   return (
     <div className="panel-grid">
       {/* Status bar */}
-      <div className="panel-toolbar">
+      <div className="working-tree-toolbar">
         {rebaseStatus?.inProgress ? (
           <span className="text-warning" style={{ fontWeight: 'bold' }}>
             ⚠️ Rebase in progress: {rebaseStatus.headName} onto {rebaseStatus.onto}
@@ -169,7 +169,7 @@ export function RebaseUI({ repoPath, rebaseStatus, onRefresh, onContinue, onSkip
 
       {/* Commit loading controls */}
       {!rebaseStatus?.inProgress && (
-        <div className="panel-toolbar">
+        <div className="working-tree-toolbar">
           <span className="toolbar-label">Base commit:</span>
           <input
             type="text"
@@ -230,7 +230,7 @@ export function RebaseUI({ repoPath, rebaseStatus, onRefresh, onContinue, onSkip
 
       {/* Action buttons */}
       {commits.length > 0 && !rebaseStatus?.inProgress && (
-        <div className="panel-toolbar">
+        <div className="working-tree-toolbar">
           <button
             onClick={handleStartRebase}
             disabled={isLoadingCommits || commits.length === 0}
@@ -243,7 +243,7 @@ export function RebaseUI({ repoPath, rebaseStatus, onRefresh, onContinue, onSkip
       )}
 
       {rebaseStatus?.inProgress && commits.length > 0 && (
-        <div className="panel-toolbar">
+        <div className="working-tree-toolbar">
           <button
             onClick={handleUpdateTodo}
             disabled={isLoadingCommits}

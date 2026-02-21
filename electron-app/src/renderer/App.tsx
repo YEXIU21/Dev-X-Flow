@@ -1,8 +1,13 @@
-import { useMemo, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { DebugMonitor } from './components/DebugMonitor'
 import { MergeResolver } from './components/MergeResolver'
 import { RebaseUI } from './components/RebaseUI'
 import { DiffViewer } from './components/DiffViewer'
+import { TitleBar } from './app-shell/TitleBar'
+import { Button } from './design-system/components/Button'
+import { Input } from './design-system/components/Input'
+import { Modal } from './design-system/components/Modal'
 
 type AppTab =
   | 'Status & Commit'
@@ -33,22 +38,21 @@ export function App() {
     []
   )
 
+  const showHints = false
+
   const [activeTab, setActiveTab] = useState<AppTab>('Status & Commit')
   const [repoPath, setRepoPath] = useState('D:\\projects\\devxflow\\repo')
-  const [status, setStatus] = useState<
-    | {
-        branch: string
-        staged: number
-        modified: number
-        created: number
-        deleted: number
-        renamed: number
-        conflicted: number
-        ahead: number
-        behind: number
-      }
-    | null
-  >(null)
+  const [status, setStatus] = useState<{
+    branch: string
+    staged: number
+    modified: number
+    created: number
+    deleted: number
+    renamed: number
+    conflicted: number
+    ahead: number
+    behind: number
+  } | null>(null)
   const [changes, setChanges] = useState<{ path: string; index: string; working_dir: string }[]>([])
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [commitMessage, setCommitMessage] = useState('')
@@ -105,12 +109,36 @@ export function App() {
   } | null>(null)
   const [rbOutput, setRbOutput] = useState('')
   const [dbBusy, setDbBusy] = useState(false)
+  const [dbEngine, setDbEngine] = useState<'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'>('sqlite')
   const [dbPath, setDbPath] = useState('')
-  const [dbConnectedPath, setDbConnectedPath] = useState<string | null>(null)
+  const [dbHost, setDbHost] = useState('127.0.0.1')
+  const [dbPort, setDbPort] = useState('')
+  const [dbUser, setDbUser] = useState('root')
+  const [dbPassword, setDbPassword] = useState('')
+  const [dbDatabase, setDbDatabase] = useState('')
+  const [dbConnectionKey, setDbConnectionKey] = useState<string | null>(null)
   const [dbSql, setDbSql] = useState('select 1 as ok;')
   const [dbResult, setDbResult] = useState<string>('')
   const [dbSqlFile, setDbSqlFile] = useState<string>('')
   const [dbSqlTables, setDbSqlTables] = useState<string[]>([])
+  // Additional Database tab state for Python GUI parity
+  const [dbUseCustomPort, setDbUseCustomPort] = useState(false)
+  const [dbNewName, setDbNewName] = useState('')
+  const [dbDropdownValue, setDbDropdownValue] = useState('')
+  const [dbDropdownOptions, setDbDropdownOptions] = useState<string[]>([])
+  const [dbStatus, setDbStatus] = useState('● Database System: Ready')
+  const [dbOutput, setDbOutput] = useState<{ text: string; level: 'info' | 'success' | 'error' | 'warning' }[]>([])
+  const [dbMysqlExe, setDbMysqlExe] = useState('')
+  const [dbSqlServerDriver, setDbSqlServerDriver] = useState('ODBC Driver 17 for SQL Server')
+  const [dbTestBusy, setDbTestBusy] = useState(false)
+  const [showCreateTableDialog, setShowCreateTableDialog] = useState(false)
+  const [ctTableName, setCtTableName] = useState('')
+  const [ctColumnsText, setCtColumnsText] = useState('id INT pk notnull\nname VARCHAR(255) notnull')
+  const [ctSqlPreview, setCtSqlPreview] = useState('')
+  const [ctBusy, setCtBusy] = useState(false)
+  const [showSelectiveRestoreDialog, setShowSelectiveRestoreDialog] = useState(false)
+  const [srSelectedTables, setSrSelectedTables] = useState<string[]>([])
+  const [srBusy, setSrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Dialog visibility states
   const [showBranchDialog, setShowBranchDialog] = useState(false)
@@ -118,6 +146,10 @@ export function App() {
   const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false)
   const [showGitAuthorDialog, setShowGitAuthorDialog] = useState(false)
   const [showSyncDialog, setShowSyncDialog] = useState(false)
+  const [branchBusy, setBranchBusy] = useState(false)
+  const [newBranchName, setNewBranchName] = useState('')
+  const [switchBranchName, setSwitchBranchName] = useState('')
+  const [deleteBranchName, setDeleteBranchName] = useState('')
   const [syncStep, setSyncStep] = useState(0)
   const [syncSteps] = useState([
     'Stage all changes',
@@ -148,6 +180,44 @@ export function App() {
       setAuthorBusy(false)
     }
   }
+
+  const clearTerminal = () => {
+    setError(null)
+    setTermResult(null)
+    setTermCommand('')
+    setTermHistoryIndex(-1)
+  }
+
+  useEffect(() => {
+    const isEditable = (el: Element | null) => {
+      if (!el) return false
+      const tag = el.tagName.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
+      if ((el as HTMLElement).isContentEditable) return true
+      return false
+    }
+
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (isEditable(document.activeElement)) return
+
+      const key = e.key.toLowerCase()
+      const ctrlOrMeta = e.ctrlKey || e.metaKey
+
+      if (ctrlOrMeta && key === 'o') {
+        e.preventDefault()
+        void handlePickRepo()
+        return
+      }
+
+      if (ctrlOrMeta && key === 'r') {
+        e.preventDefault()
+        if (repoPath) void refreshStatus(repoPath)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [repoPath])
 
   const renderTextWithLinks = (text: string) => {
     const urlRe = /(https?:\/\/[^\s]+)/g
@@ -215,6 +285,54 @@ export function App() {
     }
   }
 
+  const runCreateBranch = async () => {
+    if (!repoPath) return
+    setError(null)
+    setBranchBusy(true)
+    try {
+      await window.devxflow.createBranch(repoPath, newBranchName)
+      setNewBranchName('')
+      setShowBranchDialog(false)
+      await refreshStatus(repoPath)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  const runSwitchBranch = async () => {
+    if (!repoPath) return
+    setError(null)
+    setBranchBusy(true)
+    try {
+      await window.devxflow.switchBranch(repoPath, switchBranchName)
+      setSwitchBranchName('')
+      setShowSwitchBranchDialog(false)
+      await refreshStatus(repoPath)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  const runDeleteBranch = async () => {
+    if (!repoPath) return
+    setError(null)
+    setBranchBusy(true)
+    try {
+      await window.devxflow.deleteBranch(repoPath, deleteBranchName)
+      setDeleteBranchName('')
+      setShowDeleteBranchDialog(false)
+      await refreshStatus(repoPath)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
   const normalizeStashIndex = () => {
     if (stashIndex === '') return undefined
     if (!Number.isFinite(stashIndex)) return undefined
@@ -267,6 +385,17 @@ export function App() {
     if (!picked) return
     setRepoPath(picked)
     await refreshStatus(picked)
+  }
+
+  const handleInitRepo = async () => {
+    if (!repoPath) return
+    setError(null)
+    try {
+      await window.devxflow.initRepo(repoPath)
+      await refreshStatus(repoPath)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   const toggleSelected = (path: string) => {
@@ -474,6 +603,9 @@ const runStashAction = async (action: () => Promise<string>) => {
     setError(null)
     setTermBusy(true)
     try {
+      if (!window.devxflow?.detectProjectType || !window.devxflow?.getTerminalSuggestions) {
+        throw new Error('Preload API not available: window.devxflow. Terminal features require the preload script to load correctly.')
+      }
       const pt = await window.devxflow.detectProjectType(repoPath)
       setTermProjectType(pt)
       const sugg = await window.devxflow.getTerminalSuggestions(pt)
@@ -488,7 +620,7 @@ const runStashAction = async (action: () => Promise<string>) => {
     }
   }
 
-  const handleTerminalKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleTerminalKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       void runTerminal()
@@ -625,25 +757,62 @@ const runStashAction = async (action: () => Promise<string>) => {
 
   const browseDb = async () => {
     setError(null)
-    setDbBusy(true)
-    try {
-      const picked = await window.devxflow.pickDb()
-      if (picked) setDbPath(picked)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setDbBusy(false)
+    if (!window.devxflow?.dbPickSqlite) {
+      setError('Database picker not available in browser mode. Run in Electron.')
+      return
     }
+    const picked = await window.devxflow.dbPickSqlite()
+    if (!picked) return
+    setDbPath(picked)
   }
 
   const connectDb = async () => {
     setError(null)
     setDbBusy(true)
     try {
-      await ensureDbDefaultPath()
-      const res = await window.devxflow.connectDb(dbPath)
-      setDbConnectedPath(res.path)
-      setDbResult(`Connected: ${res.path}`)
+      const portNumber = Number(dbPort || '')
+      const port = Number.isFinite(portNumber) ? portNumber : undefined
+
+      const config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> } =
+        dbEngine === 'sqlite'
+          ? { engine: 'sqlite', config: { path: dbPath } }
+          : dbEngine === 'mysql'
+            ? {
+                engine: 'mysql',
+                config: {
+                  host: dbHost,
+                  port: typeof port === 'number' ? port : 3306,
+                  user: dbUser,
+                  password: dbPassword,
+                  database: dbDatabase || undefined,
+                },
+              }
+            : dbEngine === 'postgresql'
+              ? {
+                  engine: 'postgresql',
+                  config: {
+                    host: dbHost,
+                    port: typeof port === 'number' ? port : 5432,
+                    user: dbUser,
+                    password: dbPassword,
+                    database: dbDatabase || undefined,
+                  },
+                }
+              : {
+                  engine: 'sqlserver',
+                  config: {
+                    server: dbHost,
+                    port: typeof port === 'number' ? port : 1433,
+                    user: dbUser,
+                    password: dbPassword,
+                    database: dbDatabase || undefined,
+                  },
+                }
+
+      const res = await window.devxflow.dbConnect(config)
+      if (!res.ok) throw new Error(res.error || 'DB connection failed')
+      setDbConnectionKey(res.key)
+      setDbResult(`Connected: ${res.key}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -651,12 +820,50 @@ const runStashAction = async (action: () => Promise<string>) => {
     }
   }
 
+  const handleDbSelectiveRestore = async () => {
+    if (!dbSqlFile) {
+      setError('Please select an SQL file first')
+      return
+    }
+    if (!dbConnectionKey) return
+    if (!window.devxflow?.dbImportSqlSelective) {
+      setError('Selective restore API not available. Rebuild + restart Electron.')
+      return
+    }
+    if (srSelectedTables.length === 0) {
+      setError('Please select at least one table')
+      return
+    }
+
+    setError(null)
+    setSrBusy(true)
+    setDbBusy(true)
+    try {
+      const result = await window.devxflow.dbImportSqlSelective(dbConnectionKey, dbSqlFile, srSelectedTables)
+      if (result.success) {
+        setDbResult(`✅ Selective restore successful!\nImported ${result.tables.length} table(s): ${result.tables.join(', ')}`)
+        appendDbOutput(`Selective restore imported ${result.tables.length} tables`, 'success')
+        setShowSelectiveRestoreDialog(false)
+      } else {
+        setError(result.message)
+        appendDbOutput(result.message, 'error')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      appendDbOutput(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setSrBusy(false)
+      setDbBusy(false)
+    }
+  }
+
   const closeDb = async () => {
+    if (!dbConnectionKey) return
     setError(null)
     setDbBusy(true)
     try {
-      await window.devxflow.closeDb(dbConnectedPath || dbPath)
-      setDbConnectedPath(null)
+      await window.devxflow.dbDisconnect(dbConnectionKey)
+      setDbConnectionKey(null)
       setDbResult('Closed.')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -666,14 +873,16 @@ const runStashAction = async (action: () => Promise<string>) => {
   }
 
   const runDbQuery = async () => {
+    if (!dbConnectionKey) return
     setError(null)
     setDbBusy(true)
     try {
-      const p = dbConnectedPath || dbPath
-      const res = await window.devxflow.queryDb(p, dbSql)
+      const res = await window.devxflow.dbQuery(dbConnectionKey, dbSql)
       // Format as table-like output for better readability
       if (res.rows && res.rows.length > 0) {
-        const columns = Object.keys(res.rows[0] as Record<string, unknown>)
+        // Get column names
+        const firstRow = res.rows[0] as Record<string, unknown>
+        const columns = Object.keys(firstRow)
         let output = `Query returned ${res.rows.length} row(s):\n\n`
         output += columns.join('\t') + '\n'
         output += columns.map(() => '---').join('\t') + '\n'
@@ -767,12 +976,12 @@ const runStashAction = async (action: () => Promise<string>) => {
   }
 
   const runDbExec = async () => {
+    if (!dbConnectionKey) return
     setError(null)
     setDbBusy(true)
     try {
-      const p = dbConnectedPath || dbPath
-      const res = await window.devxflow.execDb(p, dbSql)
-      setDbResult(JSON.stringify(res, null, 2))
+      const ok = await window.devxflow.dbExecute(dbConnectionKey, dbSql)
+      setDbResult(JSON.stringify({ ok }, null, 2))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -781,6 +990,7 @@ const runStashAction = async (action: () => Promise<string>) => {
   }
 
   const handleDbExport = async () => {
+    if (!dbConnectionKey) return
     setError(null)
     setDbBusy(true)
     try {
@@ -789,8 +999,8 @@ const runStashAction = async (action: () => Promise<string>) => {
         setDbBusy(false)
         return
       }
-      const p = dbConnectedPath || dbPath
-      const result = await window.devxflow.dbExportToTxt(p, exportDir)
+
+      const result = await window.devxflow.dbExportToTxt(dbConnectionKey, exportDir)
       setDbResult(`Exported ${result.exported} tables to:\n${result.files.join('\n')}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -800,16 +1010,14 @@ const runStashAction = async (action: () => Promise<string>) => {
   }
 
   const handleDbPickSqlFile = async () => {
-    setError(null)
+    const picked = await window.devxflow.dbPickSqlFile()
+    if (!picked) return
+    setDbSqlFile(picked)
+    setDbSqlTables([])
     try {
-      const file = await window.devxflow.dbPickSqlFile()
-      if (file) {
-        setDbSqlFile(file)
-        // Scan for tables
-        const tables = await window.devxflow.dbScanSqlTables(file)
-        setDbSqlTables(tables)
-        setDbResult(`SQL file selected: ${file}\nFound ${tables.length} table(s): ${tables.join(', ')}`)
-      }
+      const tables = await window.devxflow.dbScanSqlTables(picked)
+      setDbSqlTables(tables)
+      setDbResult(`SQL file selected: ${picked}\nFound ${tables.length} table(s): ${tables.join(', ')}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -820,11 +1028,11 @@ const runStashAction = async (action: () => Promise<string>) => {
       setError('Please select an SQL file first')
       return
     }
+    if (!dbConnectionKey) return
     setError(null)
     setDbBusy(true)
     try {
-      const p = dbConnectedPath || dbPath
-      const result = await window.devxflow.dbImportSql(p, dbSqlFile)
+      const result = await window.devxflow.dbImportSql(dbConnectionKey, dbSqlFile)
       if (result.success) {
         setDbResult(`✅ Import successful!\nImported ${result.tables.length} table(s): ${result.tables.join(', ')}`)
       } else {
@@ -836,6 +1044,354 @@ const runStashAction = async (action: () => Promise<string>) => {
       setDbBusy(false)
     }
   }
+
+  const handleDbListDatabases = async () => {
+    if (!dbConnectionKey) return
+    setError(null)
+    setDbBusy(true)
+    try {
+      const dbs = await window.devxflow.dbListDatabases(dbConnectionKey)
+      if (dbs && dbs.length > 0) {
+        setDbResult(`Databases (${dbs.length}):\n${dbs.join('\n')}`)
+      } else {
+        setDbResult('No databases found or operation not supported for this engine.')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  const handleDbListTables = async () => {
+    if (!dbConnectionKey) return
+    setError(null)
+    setDbBusy(true)
+    try {
+      const tables = await window.devxflow.dbListTables(dbConnectionKey)
+      if (tables && tables.length > 0) {
+        setDbResult(`Tables (${tables.length}):\n${tables.join('\n')}`)
+        appendDbOutput(`Found ${tables.length} tables`, 'success')
+      } else {
+        setDbResult('No tables found in current database.')
+        appendDbOutput('No tables found', 'warning')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      appendDbOutput(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  // Helper to append colored output messages
+  const appendDbOutput = (text: string, level: 'info' | 'success' | 'error' | 'warning') => {
+    setDbOutput(prev => [...prev, { text, level }])
+  }
+
+  const validateDbIdentifier = (name: string) => {
+    const n = (name || '').trim()
+    if (!n) return { ok: false, message: 'Error: Name is required.' }
+    if (n.length > 128) return { ok: false, message: 'Error: Name is too long.' }
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(n)) return { ok: false, message: 'Error: Name must match ^[A-Za-z_][A-Za-z0-9_]*$' }
+    return { ok: true as const, message: 'OK' }
+  }
+
+  const quoteIdent = (name: string) => {
+    const n = (name || '').trim()
+    if (!n) return '``'
+    return '`' + n.replace(/`/g, '``') + '`'
+  }
+
+  const buildCreateTableSql = () => {
+    const table = (ctTableName || '').trim()
+    const v = validateDbIdentifier(table)
+    if (!v.ok) return { sql: null as string | null, error: v.message }
+
+    const lines = (ctColumnsText || '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+
+    if (lines.length === 0) return { sql: null, error: 'Error: At least one column is required.' }
+
+    const cols: string[] = []
+    const pkCols: string[] = []
+
+    for (const line of lines) {
+      const parts = line.split(/\s+/).filter(Boolean)
+      if (parts.length < 2) return { sql: null, error: `Error: Invalid column line: ${line}` }
+
+      const colName = parts[0]
+      const type = parts[1]
+      const flags = parts.slice(2).map((p) => p.toLowerCase())
+
+      const cv = validateDbIdentifier(colName)
+      if (!cv.ok) return { sql: null, error: cv.message }
+
+      const notNull = flags.includes('notnull') || flags.includes('nn')
+      const pk = flags.includes('pk') || flags.includes('primarykey') || (flags.includes('primary') && flags.includes('key'))
+
+      cols.push(`${quoteIdent(colName)} ${type}${notNull ? ' NOT NULL' : ''}`)
+      if (pk) pkCols.push(quoteIdent(colName))
+    }
+
+    if (cols.length === 0) return { sql: null, error: 'Error: At least one column is required.' }
+    if (pkCols.length > 0) cols.push(`PRIMARY KEY (${pkCols.join(', ')})`)
+
+    const sql = `CREATE TABLE ${quoteIdent(table)} (\n  ${cols.join(',\n  ')}\n);`
+    return { sql, error: null as string | null }
+  }
+
+  const refreshCreateTablePreview = () => {
+    const { sql, error } = buildCreateTableSql()
+    if (error) {
+      setCtSqlPreview(error)
+      return
+    }
+    setCtSqlPreview(sql || '')
+  }
+
+  const executeCreateTable = async () => {
+    if (!dbConnectionKey) return
+    const { sql, error } = buildCreateTableSql()
+    if (error || !sql) {
+      appendDbOutput(error || 'Error: Failed to build SQL.', 'error')
+      return
+    }
+    if (!window.devxflow?.dbExecute) {
+      setError('Database API not available. Run in Electron.')
+      return
+    }
+
+    setCtBusy(true)
+    try {
+      appendDbOutput('🧱 Creating table...', 'info')
+      await window.devxflow.dbExecute(dbConnectionKey, sql)
+      appendDbOutput('OK', 'success')
+      setShowCreateTableDialog(false)
+      void handleDbListTables()
+    } catch (e) {
+      appendDbOutput(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setCtBusy(false)
+    }
+  }
+
+  // Test Connection handler
+  const handleDbTestConnection = async () => {
+    setError(null)
+    setDbTestBusy(true)
+    try {
+      if (!window.devxflow?.dbTestConnection) {
+        setError('Database API not available. Run in Electron.')
+        setDbTestBusy(false)
+        return
+      }
+      const portNumber = Number(dbPort || '')
+      const port = Number.isFinite(portNumber) ? portNumber : undefined
+
+      const config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> } =
+        dbEngine === 'sqlite'
+          ? { engine: 'sqlite', config: { path: dbPath } }
+          : dbEngine === 'mysql'
+            ? {
+                engine: 'mysql',
+                config: {
+                  host: dbHost,
+                  port: dbUseCustomPort && typeof port === 'number' ? port : 3306,
+                  user: dbUser,
+                  password: dbPassword.trim() ? dbPassword : undefined,
+                  database: dbDatabase || undefined,
+                },
+              }
+            : dbEngine === 'postgresql'
+              ? {
+                  engine: 'postgresql',
+                  config: {
+                    host: dbHost,
+                    port: dbUseCustomPort && typeof port === 'number' ? port : 5432,
+                    user: dbUser,
+                    password: dbPassword.trim() ? dbPassword : undefined,
+                    database: dbDatabase || undefined,
+                  },
+                }
+              : {
+                  engine: 'sqlserver',
+                  config: {
+                    server: dbHost,
+                    port: dbUseCustomPort && typeof port === 'number' ? port : 1433,
+                    user: dbUser,
+                    password: dbPassword.trim() ? dbPassword : undefined,
+                    database: dbDatabase || undefined,
+                    driver: dbSqlServerDriver,
+                  },
+                }
+
+      const result = await window.devxflow.dbTestConnection(config)
+      if (result.ok) {
+        setDbStatus('● Connection: OK')
+        appendDbOutput('✅ Connection successful!', 'success')
+      } else {
+        setDbStatus('● Connection: Failed')
+        appendDbOutput(`❌ Connection failed: ${result.error || 'Unknown error'}`, 'error')
+      }
+    } catch (e) {
+      setDbStatus('● Connection: Error')
+      appendDbOutput(`❌ Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDbTestBusy(false)
+    }
+  }
+
+  // Refresh Database List handler
+  const handleDbRefreshList = async () => {
+    if (!dbConnectionKey) return
+    setError(null)
+    setDbBusy(true)
+    try {
+      const dbs = await window.devxflow.dbListDatabases(dbConnectionKey)
+      if (dbs && dbs.length > 0) {
+        setDbDropdownOptions(dbs)
+        setDbDropdownValue(dbs[0])
+        appendDbOutput(`Found ${dbs.length} databases`, 'success')
+      } else {
+        setDbDropdownOptions([])
+        appendDbOutput('No databases found', 'warning')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      appendDbOutput(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  // Create Database handler
+  const handleDbCreate = async () => {
+    if (!dbConnectionKey || !dbNewName.trim()) return
+    setError(null)
+    setDbBusy(true)
+    try {
+      const result = await window.devxflow.dbExecute(dbConnectionKey, `CREATE DATABASE ${dbNewName.trim()}`)
+      appendDbOutput(`✅ Database '${dbNewName.trim()}' created`, 'success')
+      setDbNewName('')
+      await handleDbRefreshList()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      appendDbOutput(`❌ Failed to create database: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  // Drop Database handler
+  const handleDbDrop = async () => {
+    if (!dbConnectionKey) return
+    const targetDb = dbDropdownValue || dbNewName.trim()
+    if (!targetDb) return
+    if (!confirm(`Drop database '${targetDb}'? This cannot be undone!`)) return
+    setError(null)
+    setDbBusy(true)
+    try {
+      const result = await window.devxflow.dbExecute(dbConnectionKey, `DROP DATABASE ${targetDb}`)
+      appendDbOutput(`🗑️ Database '${targetDb}' dropped`, 'warning')
+      await handleDbRefreshList()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      appendDbOutput(`❌ Failed to drop database: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  // Save Config handler (saves to localStorage for persistence)
+  const handleDbSaveConfig = () => {
+    const config = {
+      engine: dbEngine,
+      host: dbHost,
+      port: dbPort,
+      useCustomPort: dbUseCustomPort,
+      user: dbUser,
+      password: dbPassword,
+      database: dbDatabase,
+      mysqlExe: dbMysqlExe,
+      sqlServerDriver: dbSqlServerDriver,
+      sqlitePath: dbPath,
+    }
+    localStorage.setItem('devxflow-db-config', JSON.stringify(config))
+    appendDbOutput('✓ Database configuration saved', 'success')
+  }
+
+  // Load saved config on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('devxflow-db-config')
+    if (saved) {
+      try {
+        const config = JSON.parse(saved)
+        if (config.engine) setDbEngine(config.engine)
+        if (config.host) setDbHost(config.host)
+        if (config.port) setDbPort(config.port)
+        if (config.useCustomPort !== undefined) setDbUseCustomPort(config.useCustomPort)
+        if (config.user) setDbUser(config.user)
+        if (config.password) setDbPassword(config.password)
+        if (config.database) setDbDatabase(config.database)
+        if (config.mysqlExe) setDbMysqlExe(config.mysqlExe)
+        if (config.sqlServerDriver) setDbSqlServerDriver(config.sqlServerDriver)
+        if (config.sqlitePath) setDbPath(config.sqlitePath)
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (dbEngine !== 'mysql') return
+    if (dbMysqlExe.trim()) return
+    if (!window.devxflow?.dbDetectMysqlExe) return
+
+    let cancelled = false
+    void (async () => {
+      try {
+        const detected = await window.devxflow.dbDetectMysqlExe()
+        if (!cancelled && detected) setDbMysqlExe(detected)
+      } catch {
+        // ignore
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [dbEngine, dbMysqlExe])
+
+  const title = useMemo(() => {
+    switch (activeTab) {
+      case 'Status & Commit':
+        return 'Status & Commit'
+      case 'History':
+        return 'History'
+      case 'Remote':
+        return 'Remote'
+      case 'Stash':
+        return 'Stash'
+      case 'Terminal':
+        return 'Terminal'
+      case 'Debug':
+        return 'Debug'
+      case 'Diff Viewer':
+        return 'Diff Viewer'
+      case 'Merge Resolver':
+        return 'Merge Resolver'
+      case 'Rebase':
+        return 'Rebase'
+      case 'Database':
+        return 'Database Tools'
+      default:
+        return 'Dev-X-Flow-Pro'
+    }
+  }, [activeTab])
 
   const panelTitle = useMemo(() => {
     switch (activeTab) {
@@ -866,53 +1422,36 @@ const runStashAction = async (action: () => Promise<string>) => {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="app-title">Dev-X-Flow-Pro</div>
-        <div className="app-version">v0.1.0</div>
-      </header>
+      <div className="app-titlebar">
+        <TitleBar title={title} />
+      </div>
 
       <div className="main-container">
-        {error && (
-          <div className="app-notice app-notice-error">
-            <div className="app-notice-content">
-              <span className="app-notice-icon">⚠️</span>
-              <span className="app-notice-text">{error}</span>
-            </div>
-            <button className="app-notice-close" onClick={() => setError(null)} title="Dismiss">
-              ✕
-            </button>
+        {/* Repository Path Section - Web Style */}
+        <div className="repo-path-web">
+          <div className="repo-path-label">Repository Path</div>
+          <div className="repo-path-value-web" title={repoPath}>
+            {repoPath || 'No repository selected'}
           </div>
-        )}
-        {/* Repository Path Section - matches Python GUI */}
-        <div className="repo-section">
-          <div className="section-label">REPOSITORY PATH</div>
-          <div className="repo-path-row">
-            <div className="repo-path-value" title={repoPath}>
-              {repoPath}
-            </div>
-            <div className="repo-actions">
-              <button type="button" className="btn btn-secondary" onClick={handlePickRepo}>
-                Browse
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => refreshStatus(repoPath)}
-                disabled={!repoPath}
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-          <div className={`repo-status ${status ? 'repo-valid' : 'repo-invalid'}`}>
-            {status ? '● Git Repository' : '● Not a Git Repository'}
+          <div className="repo-path-actions">
+            <Button type="button" variant="secondary" size="sm" onClick={handlePickRepo}>
+              Browse
+            </Button>
+            {!status && repoPath ? (
+              <Button type="button" variant="primary" size="sm" onClick={() => void handleInitRepo()}>
+                Init Repo
+              </Button>
+            ) : null}
+            <Button type="button" variant="primary" size="sm" onClick={() => refreshStatus(repoPath)} disabled={!repoPath}>
+              Refresh
+            </Button>
           </div>
         </div>
 
-        {/* Branch Info Card - matches Python GUI */}
-        <div className="branch-card">
-          <div className="section-label">CURRENT BRANCH</div>
-          <div className="branch-value">{status?.branch ?? '—'}</div>
+        {/* Current Branch - Web Style */}
+        <div className="current-branch-web">
+          <div className="branch-label">Current Branch</div>
+          <div className="branch-value-web">{status?.branch || 'N/A'}</div>
         </div>
 
         {/* Tab Navigation - Top tabs like Python TNotebook */}
@@ -921,7 +1460,7 @@ const runStashAction = async (action: () => Promise<string>) => {
             <button
               key={t}
               type="button"
-              className={t === activeTab ? 'tab tab-active' : 'tab'}
+              className={t === activeTab ? 'top-tab top-tab-active' : 'top-tab'}
               onClick={() => {
                 setActiveTab(t)
                 if (t === 'Terminal') void initTerminal()
@@ -935,31 +1474,46 @@ const runStashAction = async (action: () => Promise<string>) => {
         {/* Tab Content */}
         <div className="tab-content">
           {activeTab === 'Status & Commit' ? (
-            <div className="status-enterprise">
-              {/* Branch Controls Toolbar */}
-              <div className="toolbar">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowBranchDialog(true)}>
-                  + Branch
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowSwitchBranchDialog(true)}>
-                  Switch
-                </button>
-                <button type="button" className="btn btn-danger" onClick={() => setShowDeleteBranchDialog(true)}>
-                  Delete
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => void openGitAuthorDialog()}>
-                  Author
-                </button>
-                <button type="button" className="btn btn-secondary btn-refresh" onClick={() => refreshStatus(repoPath)} disabled={!repoPath}>
-                  Refresh
-                </button>
-              </div>
+            <div className="status-web-layout">
+              {/* Working Tree Panel */}
+              <div className="working-tree-panel">
+                {/* Action Toolbar above Working Tree */}
+                <div className="working-tree-toolbar">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowBranchDialog(true)}>
+                    + New Branch
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowSwitchBranchDialog(true)}>
+                    Switch Branch
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowDeleteBranchDialog(true)}>
+                    Delete Branch
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="ai-prominent" 
+                    size="sm" 
+                    onClick={handleAiGenerate} 
+                    disabled={aiBusy || !repoPath}
+                    className="btn-ai-prominent"
+                  >
+                    {aiBusy ? '✨ Analyzing...' : '✨ AI Generate'}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="sync" 
+                    size="sm" 
+                    onClick={handleSyncToMain}
+                    disabled={!repoPath || !status || status.branch === 'main' || status.branch === 'master'}
+                  >
+                    ⚡ Sync to Main
+                  </Button>
+                </div>
 
-              {/* Git Status Panel */}
-              <div className="panel">
-                <div className="panel-title">Git Status</div>
-                <pre className="status-output">
-                  {status ? `On branch ${status.branch}
+                {/* Git Status Output - Terminal Style */}
+                <div className="working-tree-content">
+                  <div className="working-tree-header">Working Tree</div>
+                  <pre className="working-tree-terminal">
+                    {status ? `On branch ${status.branch}
 Your branch is ${status.ahead > 0 ? `ahead of origin/${status.branch} by ${status.ahead} commit(s)` : status.behind > 0 ? `behind origin/${status.branch} by ${status.behind} commit(s)` : 'up to date with origin/' + status.branch}
 
 Changes to be committed:
@@ -974,65 +1528,66 @@ ${unstagedChanges.map(c => `\tmodified:   ${c.path}`).join('\n') || '\t(no chang
 Untracked files:
   (use "git add <file>..." to include in what will be committed)
 ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t(no untracked files)'}` : 'Not a git repository. Please select or initialize a repository.'}
-                </pre>
+                  </pre>
+                </div>
               </div>
 
-              {/* Commit & Push Panel */}
-              <div className="panel">
-                <div className="panel-title">Commit & Push</div>
-                <div className="commit-section">
-                  {/* Compact Commit Row */}
-                  <div className="commit-compact-row">
-                    <input
-                      className="commit-input-compact"
-                      value={commitMessage}
-                      onChange={(e) => setCommitMessage(e.target.value)}
-                      placeholder="Enter commit message..."
-                    />
-                    <button type="button" className="btn btn-success btn-ai" onClick={handleAiGenerate} disabled={aiBusy || !repoPath}>
-                      ✨ AI
-                    </button>
-                  </div>
-                  
-                  {/* Action Buttons - Compact Row */}
-                  <div className="action-row">
-                    <button type="button" className="btn btn-primary" onClick={handleStageAll} disabled={!repoPath || (unstagedChanges.length === 0 && changes.filter(c => c.index === '?').length === 0)}>
-                      Stage All
-                    </button>
-                    <button type="button" className="btn btn-primary" onClick={handleCommit} disabled={!commitMessage.trim() || !repoPath || stagedChanges.length === 0}>
-                      Commit
-                    </button>
-                    <button type="button" className="btn btn-primary" onClick={handlePush} disabled={!repoPath || !status}>
-                      Push
-                    </button>
-                    <button type="button" className="btn btn-success" onClick={handleSyncToMain} disabled={!repoPath || !status || status.branch === 'main' || status.branch === 'master'}>
-                      Sync Main
-                    </button>
-                  </div>
+              {/* Commit Section - Bottom */}
+              <div className="commit-section-web">
+                <div className="commit-input-row">
+                  <input
+                    className="commit-input-web"
+                    value={commitMessage}
+                    onChange={(e) => setCommitMessage(e.target.value)}
+                    placeholder="Enter commit message..."
+                  />
+                </div>
+                <div className="commit-actions-row">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={handleStageAll}
+                    disabled={!repoPath || (unstagedChanges.length === 0 && changes.filter((c) => c.index === '?').length === 0)}
+                  >
+                    Stage All
+                  </Button>
+                  <Button type="button" variant="primary" size="sm" onClick={handleCommit} disabled={!commitMessage.trim() || !repoPath || stagedChanges.length === 0}>
+                    Commit
+                  </Button>
+                  <Button type="button" variant="primary" size="sm" onClick={handlePush} disabled={!repoPath || !status}>
+                    Push
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => void openGitAuthorDialog()}>
+                    Author
+                  </Button>
                 </div>
               </div>
             </div>
           ) : activeTab === 'History' ? (
               <div className="history-grid">
-                <div className="history-toolbar">
-                  <div className="commit-label">Commits</div>
-                  <input
+                {/* Compact Toolbar */}
+                <div className="working-tree-toolbar">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowHistoryGraph((prev) => !prev)}
+                    disabled={historyBusy || !repoPath}
+                  >
+                    {showHistoryGraph ? '📊 Graph' : '📋 List'}
+                  </Button>
+                  <Input
                     className="commit-input"
+                    size="sm"
                     value={String(historyCount)}
                     onChange={(e) => setHistoryCount(Number(e.target.value || '50'))}
                     placeholder="50"
                     inputMode="numeric"
                   />
-                  <button
-                    type="button"
-                    className={showHistoryGraph ? 'btn btn-primary' : 'btn'}
-                    onClick={() => setShowHistoryGraph(!showHistoryGraph)}
-                  >
-                    {showHistoryGraph ? '📊 Graph' : '📋 List'}
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={refreshHistory} disabled={historyBusy || !repoPath}>
+                  <Button type="button" variant="primary" size="sm" onClick={refreshHistory} disabled={historyBusy || !repoPath}>
                     {historyBusy ? 'Loading…' : 'Refresh'}
-                  </button>
+                  </Button>
                 </div>
 
                 {showHistoryGraph && historyGraph ? (
@@ -1070,47 +1625,44 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </div>
                 )}
 
-                <div className="panel-hint">History: Toggle between graph view (all branches) and list view.</div>
+                {showHints ? (
+                  <div className="panel-hint">History: Toggle between graph view (all branches) and list view.</div>
+                ) : null}
               </div>
             ) : activeTab === 'Remote' ? (
               <div className="remote-grid">
-                <div className="remote-toolbar">
-                  <div className="commit-label">Remote</div>
-                  <button type="button" className="btn" onClick={refreshRemotes} disabled={remoteBusy || !repoPath}>
-                    {remoteBusy ? 'Loading…' : 'Refresh Remotes'}
-                  </button>
-                  <button
+                {/* Compact Toolbar */}
+                <div className="working-tree-toolbar">
+                  <Button type="button" variant="secondary" size="sm" onClick={refreshRemotes} disabled={remoteBusy || !repoPath}>
+                    {remoteBusy ? 'Loading…' : 'Refresh'}
+                  </Button>
+                  <Button
                     type="button"
-                    className="btn btn-primary"
+                    variant="primary"
+                    size="sm"
                     onClick={() => runRemoteAction(() => window.devxflow.pull(repoPath, 'merge'))}
                     disabled={remoteBusy || !repoPath}
                   >
-                    Pull (Merge)
-                  </button>
-                  <button
+                    Pull
+                  </Button>
+                  <Button
                     type="button"
-                    className="btn btn-primary"
-                    onClick={() => runRemoteAction(() => window.devxflow.pull(repoPath, 'rebase'))}
-                    disabled={remoteBusy || !repoPath}
-                  >
-                    Pull (Rebase)
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => runRemoteAction(() => window.devxflow.fetch(repoPath))}
                     disabled={remoteBusy || !repoPath}
                   >
                     Fetch
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="btn"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => runRemoteAction(() => window.devxflow.push(repoPath))}
                     disabled={remoteBusy || !repoPath}
                   >
                     Push
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="remote-split">
@@ -1135,21 +1687,23 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                     </div>
 
                     <div className="remote-add">
-                      <input
+                      <Input
                         className="commit-input"
+                        size="sm"
                         value={remoteName}
                         onChange={(e) => setRemoteName(e.target.value)}
                         placeholder="origin"
                       />
-                      <input
+                      <Input
                         className="commit-input"
+                        size="sm"
                         value={remoteUrl}
                         onChange={(e) => setRemoteUrl(e.target.value)}
                         placeholder="https://github.com/user/repo.git"
                       />
-                      <button type="button" className="btn btn-primary" onClick={handleAddRemote} disabled={remoteBusy || !remoteUrl.trim()}>
+                      <Button type="button" variant="primary" size="sm" onClick={handleAddRemote} disabled={remoteBusy || !remoteUrl.trim()}>
                         + Add Remote
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -1159,15 +1713,24 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </div>
                 </div>
 
-                <div className="panel-hint">Remote baseline: list remotes, add remote, fetch/pull/push.</div>
+                {showHints ? <div className="panel-hint">Remote baseline: list remotes, add remote, fetch/pull/push.</div> : null}
               </div>
             ) : activeTab === 'Stash' ? (
               <div className="stash-grid">
-                <div className="stash-toolbar">
-                  <div className="commit-label">Stash</div>
-                  <button type="button" className="btn" onClick={refreshStashes} disabled={stashBusy || !repoPath}>
+                {/* Compact Toolbar */}
+                <div className="working-tree-toolbar">
+                  <Button type="button" variant="secondary" size="sm" onClick={refreshStashes} disabled={stashBusy || !repoPath}>
                     {stashBusy ? 'Loading…' : 'Refresh'}
-                  </button>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => runStashAction(() => window.devxflow.stashSave(repoPath, stashMessage))}
+                    disabled={stashBusy || !repoPath}
+                  >
+                    Save
+                  </Button>
                 </div>
 
                 <div className="stash-split">
@@ -1187,57 +1750,64 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                     </div>
 
                     <div className="stash-actions">
-                      <input
+                      <Input
                         className="commit-input"
+                        size="sm"
                         value={stashMessage}
                         onChange={(e) => setStashMessage(e.target.value)}
                         placeholder="WIP message"
                       />
-                      <button
+                      <Button
                         type="button"
-                        className="btn btn-primary"
+                        variant="primary"
+                        size="sm"
                         onClick={() => runStashAction(() => window.devxflow.stashSave(repoPath, stashMessage))}
                         disabled={stashBusy || !repoPath}
                       >
                         Save
-                      </button>
+                      </Button>
                     </div>
 
                     <div className="stash-actions">
-                      <input
+                      <Input
                         className="commit-input"
+                        size="sm"
                         value={stashIndex === '' ? '' : String(stashIndex)}
                         onChange={(e) => {
                           const v = e.target.value.trim()
-                          setStashIndex(v === '' ? '' : Number(v))
+                          if (!v) return setStashIndex('')
+                          setStashIndex(Number(v))
                         }}
                         placeholder="index (optional)"
                         inputMode="numeric"
                       />
-                      <button
+                      <Button
                         type="button"
-                        className="btn"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => runStashAction(() => window.devxflow.stashApply(repoPath, normalizeStashIndex()))}
                         disabled={stashBusy || !repoPath}
                       >
                         Apply
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="btn"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => runStashAction(() => window.devxflow.stashPop(repoPath, normalizeStashIndex()))}
                         disabled={stashBusy || !repoPath}
                       >
                         Pop
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="btn"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => runStashAction(() => window.devxflow.stashDrop(repoPath, normalizeStashIndex()))}
                         disabled={stashBusy || !repoPath}
                       >
                         Drop
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -1247,90 +1817,86 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </div>
                 </div>
 
-                <div className="panel-hint">Stash baseline: list + save + apply/pop/drop.</div>
+                {showHints ? <div className="panel-hint">Stash baseline: list + save + apply/pop/drop.</div> : null}
               </div>
+
             ) : activeTab === 'Terminal' ? (
               <div className="terminal-grid">
-                <div className="terminal-toolbar">
-                  <div className="commit-label">Terminal</div>
+                {/* Compact Toolbar */}
+                <div className="working-tree-toolbar">
                   <select
-                    className="commit-input"
+                    className="commit-input ds-input ds-input-sm"
                     aria-label="Project Type"
                     value={termProjectType}
                     onChange={async (e) => {
                       const pt = e.target.value as typeof termProjectType
                       setTermProjectType(pt)
-                      try {
-                        const sugg = await window.devxflow.getTerminalSuggestions(pt)
-                        setTermSuggestions(sugg)
-                      } catch {
-                        // ignore
-                      }
+                      const sugg = await window.devxflow.getTerminalSuggestions(pt)
+                      setTermSuggestions(sugg)
                     }}
-                    disabled={termBusy}
                   >
                     <option value="Laravel">Laravel</option>
                     <option value="Node.js">Node.js</option>
                     <option value="Python">Python</option>
                     <option value="General">General</option>
                   </select>
-                  <button type="button" className="btn" onClick={() => void initTerminal()} disabled={termBusy || !repoPath}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => void initTerminal()} disabled={termBusy || !repoPath}>
                     Detect
-                  </button>
-                  <button
-                    type="button"
-                    className={termSuggestionsEnabled ? 'btn btn-primary' : 'btn'}
-                    onClick={() => setTermSuggestionsEnabled((v) => !v)}
-                    disabled={termBusy}
-                  >
-                    Suggestions
-                  </button>
-                  <input
+                  </Button>
+                  <Input
                     className="commit-input"
+                    size="sm"
                     value={termCommand}
                     onChange={(e) => setTermCommand(e.target.value)}
                     onKeyDown={handleTerminalKeyDown}
                     placeholder="command"
                   />
-                  <button type="button" className="btn btn-primary" onClick={runTerminal} disabled={termBusy || !repoPath}>
+                  <Button type="button" variant="primary" size="sm" onClick={runTerminal} disabled={termBusy || !repoPath}>
                     {termBusy ? 'Running…' : 'Run'}
-                  </button>
+                  </Button>
                 </div>
 
-                {termSuggestionsEnabled && termSuggestions.length > 0 ? (
-                  <div className="diff-panel" aria-label="Terminal suggestions">
-                    <div className="diff-title">Suggestions</div>
-                    <div className="stash-list">
-                      {termSuggestions.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          className="history-item"
-                          onClick={() => setTermCommand(s)}
-                          disabled={termBusy}
-                        >
-                          <div className="history-msg">{s}</div>
-                        </button>
-                      ))}
+                <div className="terminal-split">
+                  {termSuggestionsEnabled && termSuggestions.length > 0 ? (
+                    <div className="diff-panel" aria-label="Terminal suggestions">
+                      <div className="diff-title">Quick Commands</div>
+                      <div className="stash-list">
+                        {termSuggestions.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className="history-item"
+                            onClick={() => setTermCommand(s)}
+                            disabled={termBusy}
+                          >
+                            <div className="history-msg">{s}</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : (
+                    <div className="diff-panel" aria-label="Terminal placeholder">
+                      <div className="diff-title">Quick Commands</div>
+                      <div className="changes-empty">Enable suggestions to see quick commands.</div>
+                    </div>
+                  )}
 
-                <div className="diff-panel" aria-label="Terminal output">
-                  <div className="diff-title">Output {termResult ? `(code: ${String(termResult.code)})` : ''}</div>
-                  <pre className="diff-body">
-                    {renderTerminalOutput()}
-                  </pre>
+                  <div className="diff-panel" aria-label="Terminal output">
+                    <div className="diff-title">Output {termResult ? `(code: ${String(termResult.code)})` : ''}</div>
+                    <pre className="diff-body">{renderTerminalOutput()}</pre>
+                  </div>
                 </div>
 
-                <div className="panel-hint">Terminal baseline: run one command in repo cwd and capture stdout/stderr.</div>
+                {showHints ? (
+                  <div className="panel-hint">Terminal baseline: run one command in repo cwd and capture stdout/stderr.</div>
+                ) : null}
               </div>
             ) : activeTab === 'Debug' ? (
-              <div style={{ height: '100%', padding: '16px' }}>
+              <div className="feature-pad">
                 <DebugMonitor repoPath={repoPath} />
               </div>
             ) : activeTab === 'Diff Viewer' ? (
-              <div style={{ height: '100%', padding: '16px' }}>
+              <div className="feature-pad">
                 <DiffViewer
                   repoPath={repoPath}
                   changes={changes}
@@ -1345,7 +1911,7 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                 />
               </div>
             ) : activeTab === 'Merge Resolver' ? (
-              <div style={{ height: '100%', padding: '16px' }}>
+              <div className="feature-pad">
                 <MergeResolver
                   repoPath={repoPath}
                   conflictedFiles={mrFiles}
@@ -1354,7 +1920,7 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                 />
               </div>
             ) : activeTab === 'Rebase' ? (
-              <div style={{ height: '100%', padding: '16px' }}>
+              <div className="feature-pad">
                 <RebaseUI
                   repoPath={repoPath}
                   rebaseStatus={rbStatus}
@@ -1367,182 +1933,537 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
               </div>
             ) : activeTab === 'Database' ? (
               <div className="db-grid">
-                <div className="terminal-toolbar">
-                  <div className="commit-label">DB</div>
-                  <input className="commit-input" value={dbPath} onChange={(e) => setDbPath(e.target.value)} placeholder="db path" />
-                  <button type="button" className="btn" onClick={browseDb} disabled={dbBusy}>
-                    Browse
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={connectDb} disabled={dbBusy}>
-                    Connect
-                  </button>
-                  <button type="button" className="btn" onClick={closeDb} disabled={dbBusy}>
-                    Close
-                  </button>
+                {/* Connection Configuration Panel - matches Python GUI */}
+                <div className="panel">
+                  <div className="panel-title">Connection Configuration</div>
+                  <div className="db-conn-row">
+                    <label className="db-label">DB Type:</label>
+                    <select
+                      className="ds-input ds-input-sm"
+                      aria-label="DB Engine"
+                      value={dbEngine}
+                      onChange={(e) => {
+                        setDbEngine(e.target.value as typeof dbEngine)
+                        setDbConnectionKey(null)
+                        setDbResult('')
+                        setError(null)
+                      }}
+                    >
+                      <option value="sqlite">SQLite</option>
+                      <option value="mysql">MySQL/MariaDB</option>
+                      <option value="postgresql">PostgreSQL</option>
+                      <option value="sqlserver">SQL Server</option>
+                    </select>
+                    {dbEngine === 'sqlite' ? (
+                      <>
+                        <Input
+                          className="commit-input"
+                          size="sm"
+                          value={dbPath}
+                          onChange={(e) => setDbPath(e.target.value)}
+                          placeholder="SQLite .db path"
+                        />
+                        <Button type="button" variant="secondary" size="sm" onClick={browseDb} disabled={dbBusy}>
+                          📂 Browse
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <label className="db-label">Host:</label>
+                        <Input className="commit-input" size="sm" value={dbHost} onChange={(e) => setDbHost(e.target.value)} placeholder="127.0.0.1" />
+                        <label className="db-label">User:</label>
+                        <Input className="commit-input" size="sm" value={dbUser} onChange={(e) => setDbUser(e.target.value)} placeholder="root" />
+                        <label className="db-label">Password:</label>
+                        <Input className="commit-input" size="sm" value={dbPassword} onChange={(e) => setDbPassword(e.target.value)} placeholder="•••••" type="password" />
+                        <label className="db-checkbox">
+                          <input type="checkbox" checked={dbUseCustomPort} onChange={(e) => setDbUseCustomPort(e.target.checked)} />
+                          Custom Port
+                        </label>
+                        {dbUseCustomPort && (
+                          <Input className="commit-input" size="sm" value={dbPort} onChange={(e) => setDbPort(e.target.value)} placeholder="3306" />
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {dbEngine === 'mysql' || dbEngine === 'sqlserver' ? (
+                    <details className="db-advanced" open={false}>
+                      <summary className="db-advanced-summary">Advanced</summary>
+                      {dbEngine === 'mysql' && (
+                        <div className="db-conn-row">
+                          <label className="db-label">mysql.exe:</label>
+                          <Input className="commit-input" size="sm" value={dbMysqlExe} onChange={(e) => setDbMysqlExe(e.target.value)} placeholder="(auto-detect)" />
+                          <Button type="button" variant="secondary" size="sm" onClick={async () => {
+                            if (!window.devxflow?.dbPickMysqlExe) {
+                              setError('File picker not available. Run in Electron.')
+                              return
+                            }
+                            const picked = await window.devxflow.dbPickMysqlExe()
+                            if (picked) setDbMysqlExe(picked)
+                          }} disabled={dbBusy}>
+                            📂 Browse
+                          </Button>
+                        </div>
+                      )}
+                      {dbEngine === 'sqlserver' && (
+                        <div className="db-conn-row">
+                          <label className="db-label">SQL Server Driver:</label>
+                          <Input className="commit-input" size="sm" value={dbSqlServerDriver} onChange={(e) => setDbSqlServerDriver(e.target.value)} placeholder="ODBC Driver 17 for SQL Server" />
+                        </div>
+                      )}
+                    </details>
+                  ) : null}
+                  <div className="working-tree-toolbar">
+                    <Button type="button" variant="primary" size="sm" onClick={handleDbTestConnection} disabled={dbTestBusy}>
+                      {dbTestBusy ? 'Testing…' : '🔗 Test Connection'}
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={handleDbSaveConfig} disabled={dbBusy}>
+                      💾 Save Config
+                    </Button>
+                    <Button type="button" variant="primary" size="sm" onClick={connectDb} disabled={dbBusy}>
+                      {dbBusy ? 'Connecting…' : 'Connect'}
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={closeDb} disabled={dbBusy || !dbConnectionKey}>
+                      Close
+                    </Button>
+                    <span className={`db-status ${dbStatus.includes('OK') ? 'db-status-ok' : dbStatus.includes('Failed') ? 'db-status-error' : ''}`}>
+                      {dbStatus}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Target Database Panel - matches Python GUI */}
+                <div className="panel">
+                  <div className="panel-title">Target Database</div>
+                  <div className="db-conn-row">
+                    <label className="db-label">Database:</label>
+                    <select
+                      className="ds-input ds-input-sm"
+                      aria-label="Select database"
+                      value={dbDropdownValue}
+                      onChange={(e) => setDbDropdownValue(e.target.value)}
+                      disabled={!dbConnectionKey}
+                    >
+                      <option value="">Select database...</option>
+                      {dbDropdownOptions.map(db => <option key={db} value={db}>{db}</option>)}
+                    </select>
+                    <label className="db-label">New DB:</label>
+                    <Input className="commit-input" size="sm" value={dbNewName} onChange={(e) => setDbNewName(e.target.value)} placeholder="new_db_name" disabled={!dbConnectionKey} />
+                    <Button type="button" variant="secondary" size="sm" onClick={handleDbRefreshList} disabled={dbBusy || !dbConnectionKey}>
+                      🔄 Refresh List
+                    </Button>
+                    <Button type="button" variant="primary" size="sm" onClick={handleDbCreate} disabled={dbBusy || !dbConnectionKey || !dbNewName.trim()}>
+                      ➕ Create DB
+                    </Button>
+                    <Button type="button" variant="danger" size="sm" onClick={handleDbDrop} disabled={dbBusy || !dbConnectionKey}>
+                      🗑 Drop DB
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={handleDbListTables} disabled={dbBusy || !dbConnectionKey}>
+                      📊 View Status
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => {
+                      setCtTableName('')
+                      setCtColumnsText('id INT pk notnull\nname VARCHAR(255) notnull')
+                      setCtSqlPreview('')
+                      setShowCreateTableDialog(true)
+                      setTimeout(() => refreshCreateTablePreview(), 0)
+                    }} disabled={dbBusy || !dbConnectionKey}>
+                      🧱 Create Table
+                    </Button>
+                  </div>
+                </div>
+
+                {/* SQL File Panel - matches Python GUI */}
+                <div className="panel">
+                  <div className="panel-title">SQL File</div>
+                  <div className="db-conn-row">
+                    <Input className="commit-input" size="sm" value={dbSqlFile} onChange={(e) => setDbSqlFile(e.target.value)} placeholder="Select SQL file to import..." />
+                    <Button type="button" variant="secondary" size="sm" onClick={handleDbPickSqlFile} disabled={dbBusy}>
+                      📂 Browse SQL
+                    </Button>
+                    {dbSqlTables.length > 0 && (
+                      <span className="db-tables-hint">Tables: {dbSqlTables.join(', ')}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Import Operations Panel - matches Python GUI */}
+                <div className="panel">
+                  <div className="panel-title">Import Operations</div>
+                  <div className="db-actions db-actions-row">
+                    <Button type="button" variant="primary" size="sm" onClick={handleDbImportSql} disabled={dbBusy || !dbSqlFile || !dbConnectionKey} className="flex-1">
+                      📥 Full Import
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => {
+                      setError(null)
+                      setSrSelectedTables(dbSqlTables.slice(0, 1))
+                      setShowSelectiveRestoreDialog(true)
+                    }} disabled={dbBusy || !dbSqlFile || !dbConnectionKey || dbSqlTables.length === 0} className="flex-1">
+                      🎯 Selective Restore
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={handleDbExport} disabled={dbBusy || !dbConnectionKey} className="flex-1">
+                      📤 Export to TXT
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="db-split">
-                  <div className="diff-panel" aria-label="SQL Import">
-                    <div className="diff-title">SQL Import (Selective Restore)</div>
-                    <div className="db-actions">
-                      <button type="button" className="btn btn-secondary" onClick={handleDbPickSqlFile} disabled={dbBusy}>
-                        📂 Browse SQL
-                      </button>
-                      <button type="button" className="btn btn-success" onClick={handleDbImportSql} disabled={dbBusy || !dbSqlFile}>
-                        🎯 Import SQL
-                      </button>
-                      <div className="panel-hint">{dbSqlFile ? `Selected: ${dbSqlFile.split('\\').pop()}` : 'No SQL file selected'}</div>
-                    </div>
-                    {dbSqlTables.length > 0 && (
-                      <div className="panel-hint db-tables-hint">
-                        Tables found: {dbSqlTables.join(', ')}
-                      </div>
-                    )}
-                  </div>
-
+                  {/* SQL Console Panel */}
                   <div className="diff-panel" aria-label="SQL">
-                    <div className="diff-title">SQL Console</div>
-                    <textarea className="commit-input" value={dbSql} onChange={(e) => setDbSql(e.target.value)} rows={10} placeholder="SQL query or command" />
+                    <div className="diff-title">SQL / DDL Console</div>
+                    <textarea className="commit-input ds-textarea" value={dbSql} onChange={(e) => setDbSql(e.target.value)} rows={8} placeholder="SQL query or command" />
                     <div className="db-actions">
-                      <button type="button" className="btn btn-primary" onClick={runDbQuery} disabled={dbBusy}>
+                      <Button type="button" variant="primary" size="sm" onClick={runDbQuery} disabled={dbBusy || !dbConnectionKey}>
                         ▶ Run SQL
-                      </button>
-                      <button type="button" className="btn" onClick={runDbExec} disabled={dbBusy}>
+                      </Button>
+                      <Button type="button" variant="secondary" size="sm" onClick={runDbExec} disabled={dbBusy || !dbConnectionKey}>
                         Exec
-                      </button>
-                      <button type="button" className="btn btn-success" onClick={handleDbExport} disabled={dbBusy}>
-                        Export to TXT
-                      </button>
-                      <button type="button" className="btn" onClick={handleClearSql} disabled={dbBusy}>
+                      </Button>
+                      <Button type="button" variant="secondary" size="sm" onClick={handleClearSql} disabled={dbBusy}>
                         🧹 Clear
-                      </button>
-                      <div className="panel-hint">Connected: {dbConnectedPath || '—'}</div>
+                      </Button>
                     </div>
                   </div>
 
+                  {/* Operation Output Panel - matches Python GUI with color tags */}
+                  <div className="diff-panel" aria-label="Operation Output">
+                    <div className="diff-title">Operation Output</div>
+                    <div className="db-output-log">
+                      {dbOutput.length === 0 ? (
+                        <div className="changes-empty">Operation output will appear here.</div>
+                      ) : (
+                        dbOutput.map((item, idx) => (
+                          <div key={idx} className={`db-output-line db-output-${item.level}`}>
+                            {item.text}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Result Panel */}
                   <div className="diff-panel" aria-label="DB result">
-                    <div className="diff-title">Result</div>
+                    <div className="diff-title">Query Result</div>
                     <pre className="diff-body db-result-pre">{dbBusy ? 'Working…' : dbResult || 'Run Query/Exec to see output.'}</pre>
                   </div>
                 </div>
 
-                <div className="panel-hint">SQL Console: Run queries, view results in table format, export to TXT.</div>
+                {showHints ? (
+                  <div className="panel-hint">
+                    Connected: {dbConnectionKey || '—'} | Multi-engine database support: SQLite, MySQL, PostgreSQL, SQL Server
+                  </div>
+                ) : null}
               </div>
             ) : (
-              <div className="panel-hint">
-                UI shell created. Next: implement real {activeTab} features from `Dev-X-Flow-Pro/Dev-X-Flow-Pro.py`.
-              </div>
+              showHints ? (
+                <div className="panel-hint">
+                  UI shell created. Next: implement real {activeTab} features from `Dev-X-Flow-Pro/Dev-X-Flow-Pro.py`.
+                </div>
+              ) : null
             )}
           </div>
       </div>
 
-      {showGitAuthorDialog ? (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Git Author">
-          <div className="modal">
-            <div className="modal-title">Git Author</div>
-            <div className="modal-body">
-              <label className="modal-label" htmlFor="author-name">
-                Name
-              </label>
-              <input
-                id="author-name"
-                className="commit-input"
-                value={authorName}
-                onChange={(e) => setAuthorName(e.target.value)}
-                placeholder="Your Name"
-                disabled={authorBusy}
-              />
-              <label className="modal-label" htmlFor="author-email">
-                Email
-              </label>
-              <input
-                id="author-email"
-                className="commit-input"
-                value={authorEmail}
-                onChange={(e) => setAuthorEmail(e.target.value)}
-                placeholder="you@example.com"
-                disabled={authorBusy}
-              />
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setShowGitAuthorDialog(false)} disabled={authorBusy}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn-primary" onClick={() => void saveGitAuthor()} disabled={authorBusy}>
-                {authorBusy ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Toast notification - floating corner */}
+      {error && createPortal(
+        <div className="app-notice app-notice-error">
+          <span className="app-notice-text">{error}</span>
+          <button className="app-notice-close" onClick={() => setError(null)} aria-label="Dismiss">
+            ×
+          </button>
+        </div>,
+        document.body
+      )}
 
-      {showSyncDialog ? (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Sync to Main">
-          <div className="modal sync-modal">
-            <div className="modal-title">Sync to Main Workflow</div>
-            <div className="modal-body">
-              <p className="sync-modal-lead">
-                This will execute the following steps to sync your feature branch to main:
-              </p>
-              <div className="sync-steps">
-                {syncSteps.map((step, index) => (
-                  <div
-                    key={step}
-                    className={
-                      syncStep === 0
-                        ? 'sync-step'
-                        : syncStep > index
-                          ? 'sync-step sync-step-done'
-                          : syncStep === index + 1
-                            ? 'sync-step sync-step-active'
-                            : 'sync-step'
-                    }
-                  >
-                    <span
-                      className={
-                        syncStep > index + 1
-                          ? 'sync-step-badge sync-step-badge-done'
-                          : syncStep === index + 1
-                            ? 'sync-step-badge sync-step-badge-active'
-                            : 'sync-step-badge'
-                      }
-                    >
-                      {syncStep > index + 1 ? '✓' : index + 1}
-                    </span>
-                    <span className={syncStep === index + 1 ? 'sync-step-text sync-step-text-active' : 'sync-step-text'}>{step}</span>
-                  </div>
-                ))}
-              </div>
-              {syncStep > 0 && (
-                <div className="sync-progress">
-                  <div className="sync-progress-track">
-                    <div className="sync-progress-bar" style={{ width: `${(syncStep / syncSteps.length) * 100}%` }} />
-                  </div>
-                  <p className="sync-progress-text">
-                    Step {syncStep} of {syncSteps.length}: {syncSteps[syncStep - 1]}
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="modal-actions">
-              {syncStep === 0 ? (
-                <>
-                  <button type="button" className="btn" onClick={() => setShowSyncDialog(false)}>
-                    Cancel
-                  </button>
-                  <button type="button" className="btn btn-success" onClick={() => void executeSyncToMain()}>
-                    Start Sync
-                  </button>
-                </>
-              ) : (
-                <button type="button" className="btn" onClick={() => setShowSyncDialog(false)} disabled={syncStep > 0 && syncStep < syncSteps.length}>
-                  {syncStep >= syncSteps.length ? 'Close' : 'Running...'}
-                </button>
-              )}
-            </div>
-          </div>
+      <Modal
+        open={showCreateTableDialog}
+        title="Create Table"
+        ariaLabel="Create Table"
+        onClose={() => setShowCreateTableDialog(false)}
+        actions={
+          <>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowCreateTableDialog(false)} disabled={ctBusy}>
+              Cancel
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => refreshCreateTablePreview()} disabled={ctBusy}>
+              Preview
+            </Button>
+            <Button type="button" variant="primary" size="sm" onClick={() => void executeCreateTable()} disabled={ctBusy || !dbConnectionKey}>
+              {ctBusy ? 'Working…' : 'Create'}
+            </Button>
+          </>
+        }
+      >
+        <label className="modal-label" htmlFor="ct-table-name">Table name</label>
+        <Input
+          id="ct-table-name"
+          className="commit-input"
+          size="sm"
+          value={ctTableName}
+          onChange={(e) => setCtTableName(e.target.value)}
+          placeholder="my_table"
+          disabled={ctBusy}
+        />
+        <label className="modal-label" htmlFor="ct-columns">Columns (one per line: name TYPE [pk] [notnull])</label>
+        <textarea
+          id="ct-columns"
+          className="commit-input ds-textarea"
+          value={ctColumnsText}
+          onChange={(e) => setCtColumnsText(e.target.value)}
+          rows={6}
+          disabled={ctBusy}
+        />
+        <label className="modal-label" htmlFor="ct-preview">SQL preview</label>
+        <textarea
+          id="ct-preview"
+          className="commit-input ds-textarea"
+          value={ctSqlPreview}
+          onChange={(e) => setCtSqlPreview(e.target.value)}
+          rows={6}
+          disabled={ctBusy}
+          placeholder="Click Preview to generate CREATE TABLE SQL"
+        />
+      </Modal>
+
+      <Modal
+        open={showSelectiveRestoreDialog}
+        title="Selective Restore"
+        ariaLabel="Selective Restore"
+        onClose={() => setShowSelectiveRestoreDialog(false)}
+        actions={
+          <>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowSelectiveRestoreDialog(false)} disabled={srBusy}>
+              Cancel
+            </Button>
+            <Button type="button" variant="primary" size="sm" onClick={() => void handleDbSelectiveRestore()} disabled={srBusy || !dbConnectionKey || srSelectedTables.length === 0}>
+              {srBusy ? 'Working…' : 'Restore'}
+            </Button>
+          </>
+        }
+      >
+        <div className="sr-meta">SQL file: {dbSqlFile || '—'}</div>
+        <div className="sr-meta">Detected tables: {dbSqlTables.length}</div>
+        <div className="sr-table-list">
+          {dbSqlTables.map((t) => {
+            const checked = srSelectedTables.includes(t)
+            return (
+              <label key={t} className="sr-table-item">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    setSrSelectedTables((prev) => (on ? [...prev, t] : prev.filter((x) => x !== t)))
+                  }}
+                />
+                <span className="sr-table-name">{t}</span>
+              </label>
+            )
+          })}
         </div>
-      ) : null}
+      </Modal>
+
+      <Modal
+        open={showGitAuthorDialog}
+        title="Git Author"
+        ariaLabel="Git Author"
+        onClose={() => setShowGitAuthorDialog(false)}
+        actions={
+          <>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowGitAuthorDialog(false)} disabled={authorBusy}>
+              Cancel
+            </Button>
+            <Button type="button" variant="primary" size="sm" onClick={() => void saveGitAuthor()} disabled={authorBusy}>
+              {authorBusy ? 'Saving…' : 'Save'}
+            </Button>
+          </>
+        }
+      >
+        <label className="modal-label" htmlFor="author-name">
+          Name
+        </label>
+        <Input
+          id="author-name"
+          className="commit-input"
+          size="sm"
+          value={authorName}
+          onChange={(e) => setAuthorName(e.target.value)}
+          placeholder="Your Name"
+          disabled={authorBusy}
+        />
+        <label className="modal-label" htmlFor="author-email">
+          Email
+        </label>
+        <Input
+          id="author-email"
+          className="commit-input"
+          size="sm"
+          value={authorEmail}
+          onChange={(e) => setAuthorEmail(e.target.value)}
+          placeholder="you@example.com"
+          disabled={authorBusy}
+        />
+      </Modal>
+
+      <Modal
+        open={showSyncDialog}
+        title="Sync to Main Workflow"
+        ariaLabel="Sync to Main"
+        onClose={() => setShowSyncDialog(false)}
+        className="sync-modal"
+        actions={
+          syncStep === 0 ? (
+            <>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setShowSyncDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="button" variant="primary" size="sm" onClick={() => void executeSyncToMain()}>
+                Start Sync
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowSyncDialog(false)}
+              disabled={syncStep > 0 && syncStep < syncSteps.length}
+            >
+              {syncStep >= syncSteps.length ? 'Close' : 'Running...'}
+            </Button>
+          )
+        }
+      >
+        <p className="sync-modal-lead">This will execute the following steps to sync your feature branch to main:</p>
+        <div className="sync-steps">
+          {syncSteps.map((step, index) => (
+            <div
+              key={step}
+              className={
+                syncStep === 0
+                  ? 'sync-step'
+                  : syncStep > index
+                    ? 'sync-step sync-step-done'
+                    : syncStep === index + 1
+                      ? 'sync-step sync-step-active'
+                      : 'sync-step'
+              }
+            >
+              <span
+                className={
+                  syncStep > index + 1
+                    ? 'sync-step-badge sync-step-badge-done'
+                    : syncStep === index + 1
+                      ? 'sync-step-badge sync-step-badge-active'
+                      : 'sync-step-badge'
+                }
+              >
+                {syncStep > index + 1 ? '✓' : index + 1}
+              </span>
+              <span className={syncStep === index + 1 ? 'sync-step-text sync-step-text-active' : 'sync-step-text'}>{step}</span>
+            </div>
+          ))}
+        </div>
+        {syncStep > 0 && (
+          <div className="sync-progress">
+            <div className="sync-progress-track">
+              <div className="sync-progress-bar" style={{ width: `${(syncStep / syncSteps.length) * 100}%` }} />
+            </div>
+            <p className="sync-progress-text">
+              Step {syncStep} of {syncSteps.length}: {syncSteps[syncStep - 1]}
+            </p>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={showBranchDialog}
+        title="Create Branch"
+        ariaLabel="Create Branch"
+        onClose={() => setShowBranchDialog(false)}
+        actions={
+          <>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowBranchDialog(false)} disabled={branchBusy}>
+              Cancel
+            </Button>
+            <Button type="button" variant="primary" size="sm" onClick={() => void runCreateBranch()} disabled={branchBusy || !repoPath}>
+              {branchBusy ? 'Working…' : 'Create'}
+            </Button>
+          </>
+        }
+      >
+        <label className="modal-label" htmlFor="branch-create-name">
+          Branch name
+        </label>
+        <Input
+          id="branch-create-name"
+          className="commit-input"
+          size="sm"
+          value={newBranchName}
+          onChange={(e) => setNewBranchName(e.target.value)}
+          placeholder="feature/my-change"
+          disabled={branchBusy}
+        />
+      </Modal>
+
+      <Modal
+        open={showSwitchBranchDialog}
+        title="Switch Branch"
+        ariaLabel="Switch Branch"
+        onClose={() => setShowSwitchBranchDialog(false)}
+        actions={
+          <>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowSwitchBranchDialog(false)} disabled={branchBusy}>
+              Cancel
+            </Button>
+            <Button type="button" variant="primary" size="sm" onClick={() => void runSwitchBranch()} disabled={branchBusy || !repoPath}>
+              {branchBusy ? 'Working…' : 'Switch'}
+            </Button>
+          </>
+        }
+      >
+        <label className="modal-label" htmlFor="branch-switch-name">
+          Branch name
+        </label>
+        <Input
+          id="branch-switch-name"
+          className="commit-input"
+          size="sm"
+          value={switchBranchName}
+          onChange={(e) => setSwitchBranchName(e.target.value)}
+          placeholder="main"
+          disabled={branchBusy}
+        />
+      </Modal>
+
+      <Modal
+        open={showDeleteBranchDialog}
+        title="Delete Branch"
+        ariaLabel="Delete Branch"
+        onClose={() => setShowDeleteBranchDialog(false)}
+        actions={
+          <>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowDeleteBranchDialog(false)} disabled={branchBusy}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" size="sm" onClick={() => void runDeleteBranch()} disabled={branchBusy || !repoPath}>
+              {branchBusy ? 'Working…' : 'Delete'}
+            </Button>
+          </>
+        }
+      >
+        <label className="modal-label" htmlFor="branch-delete-name">
+          Branch name
+        </label>
+        <Input
+          id="branch-delete-name"
+          className="commit-input"
+          size="sm"
+          value={deleteBranchName}
+          onChange={(e) => setDeleteBranchName(e.target.value)}
+          placeholder="feature/old-branch"
+          disabled={branchBusy}
+        />
+      </Modal>
     </div>
   )
 }

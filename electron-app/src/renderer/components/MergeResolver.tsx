@@ -105,7 +105,7 @@ export function MergeResolver({ repoPath, conflictedFiles, onRefresh, isLoading 
   return (
     <div className="panel-grid">
       {/* Status bar */}
-      <div className="panel-toolbar">
+      <div className="working-tree-toolbar">
         <span className={conflictedFiles.length > 0 ? 'text-warning' : 'text-success'} style={{ fontWeight: 'bold' }}>
           {conflictedFiles.length > 0
             ? `⚠️ ${conflictedFiles.length} file(s) with conflicts`
@@ -137,8 +137,8 @@ export function MergeResolver({ repoPath, conflictedFiles, onRefresh, isLoading 
       <div className="diff-split">
         {/* File list */}
         <div className="mr-file-list">
-          <div className="mr-view-selector" style={{ borderBottom: '1px solid var(--border)', height: '42px', display: 'flex', alignItems: 'center' }}>
-            <span className="toolbar-label" style={{ marginLeft: '12px', fontWeight: 'bold' }}>Conflicted Files</span>
+          <div className="diff-panel-header">
+            Conflicted Files
           </div>
           <div className="diff-file-items">
             {conflictedFiles.length === 0 ? (
@@ -161,7 +161,7 @@ export function MergeResolver({ repoPath, conflictedFiles, onRefresh, isLoading 
         {/* Content view */}
         <div className="mr-content-view">
           {/* View selector */}
-          <div className="mr-view-selector" style={{ height: '42px', display: 'flex', alignItems: 'center' }}>
+          <div className="mr-view-selector">
             <span className="toolbar-label" style={{ marginRight: '8px' }}>
               View:
             </span>
