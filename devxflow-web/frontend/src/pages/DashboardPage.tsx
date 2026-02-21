@@ -37,10 +37,11 @@ export function DashboardPage() {
   return (
     <div className="dashboard-page">
       <nav className="nav">
-        <div className="logo">Dev-X-Flow-Pro</div>
+        <div className="logo">Dev-X-Flow</div>
         <div className="nav-links">
           <Link to="/">Home</Link>
           <Link to="/pricing">Pricing</Link>
+          <Link to="/download">Download</Link>
           <Link to="/contact">Contact</Link>
           <Link to="/changelog">Changelog</Link>
           <Link to="/logout">Logout</Link>

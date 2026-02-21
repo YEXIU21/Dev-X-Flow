@@ -125,6 +125,92 @@ router.get('/search', async (req, res) => {
     }
 });
 
+// Generate new license
+router.post('/license/generate', async (req, res) => {
+    try {
+        const { customer_email, max_activations, expires_at } = req.body;
+        
+        // Generate a random secure license key (e.g., DEVX-XXXX-XXXX-XXXX)
+        const crypto = require('crypto');
+        const key = `DEVX-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+        const license = new models.License({
+            license_key: key,
+            customer_email,
+            max_activations: max_activations || 3,
+            expires_at: expires_at ? new Date(expires_at) : null,
+            status: 'active'
+        });
+
+        await license.save();
+
+        res.json({
+            success: true,
+            license: {
+                id: license._id,
+                license_key: license.license_key,
+                customer_email: license.customer_email,
+                max_activations: license.max_activations,
+                status: license.status
+            }
+        });
+
+    } catch (error) {
+        console.error('Generate license error:', error);
+        res.status(500).json({ error: 'Failed to generate license' });
+    }
+});
+
+// Revoke/Delete license
+router.delete('/license/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const license = await models.License.findById(id);
+        
+        if (!license) {
+            return res.status(404).json({ error: 'License not found' });
+        }
+
+        // Option 1: Hard delete
+        await models.License.findByIdAndDelete(id);
+        // Option 2: Soft delete / revoke (already in schema but let's do hard delete for cleanup)
+        await models.Activation.deleteMany({ license_id: id });
+
+        res.json({
+            success: true,
+            message: 'License and associated activations removed'
+        });
+
+    } catch (error) {
+        console.error('Delete license error:', error);
+        res.status(500).json({ error: 'Failed to delete license' });
+    }
+});
+
+// Reset activations for a license
+router.post('/license/:id/reset', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const license = await models.License.findById(id);
+        
+        if (!license) {
+            return res.status(404).json({ error: 'License not found' });
+        }
+
+        // Remove all activations for this license
+        await models.Activation.deleteMany({ license_id: id });
+
+        res.json({
+            success: true,
+            message: 'Activations reset successfully'
+        });
+
+    } catch (error) {
+        console.error('Reset activations error:', error);
+        res.status(500).json({ error: 'Failed to reset activations' });
+    }
+});
+
 // Change admin password
 router.post('/change-password', async (req, res) => {
     try {

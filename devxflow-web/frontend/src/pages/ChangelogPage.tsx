@@ -118,7 +118,8 @@ export function ChangelogPage() {
       </div>
       
       <footer className="footer">
-        <p>&copy; 2026 Dev-X-Flow-Pro. All rights reserved.</p>
+        <h2>Why DevXFlow?</h2>
+        <p>&copy; 2026 DevXFlow. All rights reserved.</p>
       </footer>
 
       <style jsx>{`

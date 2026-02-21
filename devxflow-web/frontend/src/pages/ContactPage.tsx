@@ -36,7 +36,7 @@ export function ContactPage() {
       
       <div className="contact-container">
         <div className="contact-header">
-          <h1>Contact Us</h1>
+          <h1>Contact DevXFlow Support</h1>
           <p>Get in touch with the Dev-X-Flow-Pro team</p>
         </div>
         

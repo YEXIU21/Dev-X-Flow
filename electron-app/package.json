@@ -15,8 +15,8 @@
     "dist": "npm run build && electron-builder build --win"
   },
   "build": {
-    "appId": "com.devxflow.pro",
-    "productName": "DevXFlowPro",
+    "appId": "com.devxflow",
+    "productName": "Dev-X-Flow",
     "directories": {
       "output": "dist"
     },
@@ -34,6 +34,7 @@
     "better-sqlite3": "^11.8.1",
     "mssql": "^12.2.0",
     "mysql2": "^3.17.0",
+    "node-machine-id": "^1.1.12",
     "pg": "^8.18.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

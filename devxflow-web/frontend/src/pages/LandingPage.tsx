@@ -27,7 +27,7 @@ export function LandingPage() {
       <PricingSection />
       
       <footer className="footer">
-        <p>&copy; 2026 Dev-X-Flow-Pro. All rights reserved.</p>
+        <p>&copy; 2026 Dev-X-Flow. All rights reserved.</p>
       </footer>
     </>
   )

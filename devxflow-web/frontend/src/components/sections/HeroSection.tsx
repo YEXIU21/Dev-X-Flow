@@ -80,7 +80,7 @@ export function HeroSection() {
             <div className="terminal-dot red"></div>
             <div className="terminal-dot yellow"></div>
             <div className="terminal-dot green"></div>
-            <div className="terminal-title">devxflow-pro --version</div>
+            <h1 className="hero-title">Dev-X-Flow</h1> --version
           </div>
           <div className="terminal-body">
             <div className="terminal-line">

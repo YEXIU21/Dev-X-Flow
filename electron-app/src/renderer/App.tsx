@@ -1416,12 +1416,15 @@ const runStashAction = async (action: () => Promise<string>) => {
       case 'Database':
         return 'Database Tools'
       default:
-        return 'Dev-X-Flow-Pro'
+        return 'DevXFlow'
     }
   }, [activeTab])
 
   return (
     <div className="app">
+      <header className="app-header">
+        <div className="app-logo">Dev-X-Flow</div>
+      </header>
       <div className="app-titlebar">
         <TitleBar title={title} />
       </div>

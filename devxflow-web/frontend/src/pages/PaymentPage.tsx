@@ -127,12 +127,12 @@ export function PaymentPage() {
       <div className="payment-container">
         <div className="payment-header">
           <h1>Complete Your Purchase</h1>
-          <p>Choose your plan and secure your Dev-X-Flow-Pro license</p>
+          <p>Choose your plan and secure your DevXFlow license</p>
         </div>
         
         <div className="payment-content">
           <div className="plan-selection">
-            <h2>Select Your Plan</h2>
+            <h1>Get DevXFlow</h1>
             <div className="plans-grid">
               {plans.map(plan => (
                 <div 

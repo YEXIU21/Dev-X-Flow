@@ -47,7 +47,7 @@ export function RegisterPage() {
       <div className="register-container">
         <div className="header">
           <h1>Create Account</h1>
-          <p>Join Dev-X-Flow-Pro today</p>
+          <p>Join DevXFlow today</p>
         </div>
         
         {error && (

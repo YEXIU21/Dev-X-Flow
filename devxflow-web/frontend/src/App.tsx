@@ -55,6 +55,7 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/changelog" element={<ChangelogPage />} />
             <Route path="/payment" element={<PaymentPage />} />
+            <Route path="/download" element={<DownloadPage />} />
           </Route>
 
           {/* Auth Routes */}

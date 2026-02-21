@@ -17,7 +17,8 @@ export function Navbar() {
         <Link to="/#features">Features</Link>
         <Link to="/#showcase">Showcase</Link>
         <Link to="/#pricing">Pricing</Link>
-        <Link to="/changelog">Changelog</Link>
+        <Link to="/" className="logo">Dev-X-Flow</Link>
+        <Link to="/download">Download</Link>
         <Link to="/contact">Contact</Link>
         <Link to="/login">Login</Link>
         <Link to="/register">Register</Link>
