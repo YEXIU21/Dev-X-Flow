@@ -287,6 +287,14 @@ async function getLog(repoPath: string, maxCount: number): Promise<CommitItem[]>
   }))
 }
 
+async function getLogGraph(repoPath: string, maxCount: number): Promise<string> {
+  const git = simpleGit({ baseDir: repoPath })
+  const count = Number.isFinite(maxCount) ? Math.max(1, Math.min(200, maxCount)) : 50
+  // Get graph output: oneline with graph, all branches, decorated
+  const output = await git.raw(['log', '--oneline', '--graph', '--all', '--decorate', '-n', String(count)])
+  return output
+}
+
 async function getCommitDetails(repoPath: string, hash: string): Promise<string> {
   const git = simpleGit({ baseDir: repoPath })
   if (!hash) throw new Error('hash is required')
@@ -479,9 +487,28 @@ async function stageAll(repoPath: string) {
   await git.add('.')
 }
 
+async function initRepo(repoPath: string) {
+  const git = simpleGit({ baseDir: repoPath })
+  await git.init()
+}
+
+async function createBranch(repoPath: string, branch: string) {
+  const git = simpleGit({ baseDir: repoPath })
+  const name = (branch || '').trim()
+  if (!name) throw new Error('branch is required')
+  await git.checkoutLocalBranch(name)
+}
+
 async function switchBranch(repoPath: string, branch: string) {
   const git = simpleGit({ baseDir: repoPath })
   await git.checkout(branch)
+}
+
+async function deleteBranch(repoPath: string, branch: string) {
+  const git = simpleGit({ baseDir: repoPath })
+  const name = (branch || '').trim()
+  if (!name) throw new Error('branch is required')
+  await git.deleteLocalBranch(name, true)
 }
 
 async function mergeBranch(repoPath: string, branch: string) {
@@ -657,6 +684,11 @@ export function registerGitIpc() {
     return await getLog(repoPath, count)
   })
 
+  ipcMain.handle('repo:log-graph', async (_event, repoPath: string, maxCount: number) => {
+    if (!repoPath) throw new Error('repoPath is required')
+    return await getLogGraph(repoPath, maxCount)
+  })
+
   ipcMain.handle('repo:commit-details', async (_event, repoPath: string, hash: string) => {
     if (!repoPath) throw new Error('repoPath is required')
     return await getCommitDetails(repoPath, hash)
@@ -782,53 +814,33 @@ export function registerGitIpc() {
     return await rebaseAction(repoPath, 'abort')
   })
 
-  ipcMain.handle('db:default-path', async () => {
-    return getDefaultDbPath()
-  })
-
-  ipcMain.handle('db:pick', async () => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile', 'createDirectory'],
-      title: 'Select a SQLite database file',
-      filters: [{ name: 'SQLite', extensions: ['db', 'sqlite', 'sqlite3'] }],
-    })
-
-    if (result.canceled || result.filePaths.length === 0) return null
-    return result.filePaths[0]
-  })
-
-  ipcMain.handle('db:connect', async (_event, dbPath: string) => {
-    const { path } = getOrOpenDb(dbPath)
-    return { ok: true, path }
-  })
-
-  ipcMain.handle('db:query', async (_event, dbPath: string, sql: string) => {
-    const { db } = getOrOpenDb(dbPath)
-    const q = (sql || '').trim()
-    if (!q) throw new Error('sql is required')
-    const stmt = db.prepare(q)
-    const rows = stmt.all()
-    const res: DbQueryResult = { rows }
-    return res
-  })
-
-  ipcMain.handle('db:exec', async (_event, dbPath: string, sql: string) => {
-    const { db } = getOrOpenDb(dbPath)
-    const q = (sql || '').trim()
-    if (!q) throw new Error('sql is required')
-    db.exec(q)
-    return { ok: true }
-  })
-
   ipcMain.handle('repo:stage-all', async (_event, repoPath: string) => {
     if (!repoPath) throw new Error('repoPath is required')
     await stageAll(repoPath)
     return true
   })
 
+  ipcMain.handle('repo:init', async (_event, repoPath: string) => {
+    if (!repoPath) throw new Error('repoPath is required')
+    await initRepo(repoPath)
+    return true
+  })
+
+  ipcMain.handle('repo:create-branch', async (_event, repoPath: string, branch: string) => {
+    if (!repoPath) throw new Error('repoPath is required')
+    await createBranch(repoPath, branch)
+    return true
+  })
+
   ipcMain.handle('repo:switch-branch', async (_event, repoPath: string, branch: string) => {
     if (!repoPath) throw new Error('repoPath is required')
     await switchBranch(repoPath, branch)
+    return true
+  })
+
+  ipcMain.handle('repo:delete-branch', async (_event, repoPath: string, branch: string) => {
+    if (!repoPath) throw new Error('repoPath is required')
+    await deleteBranch(repoPath, branch)
     return true
   })
 

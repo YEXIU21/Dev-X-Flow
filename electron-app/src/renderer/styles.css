@@ -625,6 +625,167 @@ body {
   font-size: 12px;
 }
 
+/* Global App Notice Styles */
+.app-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid transparent;
+  animation: slideIn 0.2s ease-out;
+}
+
+.app-notice-error {
+  background: rgba(255, 71, 87, 0.1);
+  border-color: rgba(255, 71, 87, 0.25);
+  color: #ff8a8a;
+}
+
+.app-notice-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.app-notice-icon {
+  font-size: 16px;
+}
+
+.app-notice-close {
+  background: transparent;
+  border: none;
+  color: currentColor;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+.app-notice-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+
+.history-graph-pre {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.db-result-pre {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+}
+
+.db-tables-hint {
+  margin-top: 8px;
+}
+
+.sync-modal {
+  max-width: 500px;
+}
+
+.sync-modal-lead {
+  margin-bottom: 16px;
+  color: #888888;
+}
+
+.sync-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sync-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.sync-step-done {
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.sync-step-active {
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid var(--accent);
+}
+
+.sync-step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  background: var(--panel);
+  color: #888;
+}
+
+.sync-step-badge-done {
+  background: var(--success);
+  color: #000;
+}
+
+.sync-step-badge-active {
+  background: var(--accent);
+  color: #000;
+}
+
+.sync-step-text {
+  color: #888;
+}
+
+.sync-step-text-active {
+  color: var(--text);
+}
+
+.sync-progress {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.sync-progress-track {
+  width: 100%;
+  height: 4px;
+  background: var(--panel);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sync-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.sync-progress-text {
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
 .status-grid {
   display: flex;
   flex-direction: column;

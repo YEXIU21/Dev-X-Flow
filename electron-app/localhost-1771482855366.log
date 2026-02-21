@@ -1,0 +1,208 @@
+VM5 sandbox_bundle:2 Unable to load preload script: D:\z_Vault\v6 debug section\gittools\electron-app\dist-main\preload\index.js
+(anonymous) @ VM5 sandbox_bundle:2
+VM5 sandbox_bundle:2 SyntaxError: Cannot use import statement outside a module
+    at runPreloadScript (VM5 sandbox_bundle:2:151981)
+    at VM5 sandbox_bundle:2:152300
+    at VM5 sandbox_bundle:2:152455
+    at ___electron_webpack_init__ (VM5 sandbox_bundle:2:152459)
+    at VM5 sandbox_bundle:2:152582
+(anonymous) @ VM5 sandbox_bundle:2
+chunk-HCIN4FJ4.js?v=c4d88d4a:21607 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+VM5 sandbox_bundle:2 Electron Security Warning (Insecure Content-Security-Policy) This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+warnAboutInsecureCSP @ VM5 sandbox_bundle:2
+App.tsx:1825 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'dbPickSqlFile')
+    at onClick (App.tsx:1825:62)
+    at HTMLUnknownElement.callCallback2 (chunk-HCIN4FJ4.js?v=c4d88d4a:3678:22)
+    at Object.invokeGuardedCallbackDev (chunk-HCIN4FJ4.js?v=c4d88d4a:3703:24)
+    at invokeGuardedCallback (chunk-HCIN4FJ4.js?v=c4d88d4a:3737:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-HCIN4FJ4.js?v=c4d88d4a:3740:33)
+    at executeDispatch (chunk-HCIN4FJ4.js?v=c4d88d4a:7044:11)
+    at processDispatchQueueItemsInOrder (chunk-HCIN4FJ4.js?v=c4d88d4a:7064:15)
+    at processDispatchQueue (chunk-HCIN4FJ4.js?v=c4d88d4a:7073:13)
+    at dispatchEventsForPlugins (chunk-HCIN4FJ4.js?v=c4d88d4a:7081:11)
+    at chunk-HCIN4FJ4.js?v=c4d88d4a:7204:20
+onClick @ App.tsx:1825
+callCallback2 @ chunk-HCIN4FJ4.js?v=c4d88d4a:3678
+invokeGuardedCallbackDev @ chunk-HCIN4FJ4.js?v=c4d88d4a:3703
+invokeGuardedCallback @ chunk-HCIN4FJ4.js?v=c4d88d4a:3737
+invokeGuardedCallbackAndCatchFirstError @ chunk-HCIN4FJ4.js?v=c4d88d4a:3740
+executeDispatch @ chunk-HCIN4FJ4.js?v=c4d88d4a:7044
+processDispatchQueueItemsInOrder @ chunk-HCIN4FJ4.js?v=c4d88d4a:7064
+processDispatchQueue @ chunk-HCIN4FJ4.js?v=c4d88d4a:7073
+dispatchEventsForPlugins @ chunk-HCIN4FJ4.js?v=c4d88d4a:7081
+(anonymous) @ chunk-HCIN4FJ4.js?v=c4d88d4a:7204
+batchedUpdates$1 @ chunk-HCIN4FJ4.js?v=c4d88d4a:18964
+batchedUpdates @ chunk-HCIN4FJ4.js?v=c4d88d4a:3583
+dispatchEventForPluginEventSystem @ chunk-HCIN4FJ4.js?v=c4d88d4a:7203
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-HCIN4FJ4.js?v=c4d88d4a:5482
+dispatchEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5476
+dispatchDiscreteEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5453
+App.tsx:1825 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'dbPickSqlFile')
+    at onClick (App.tsx:1825:62)
+    at HTMLUnknownElement.callCallback2 (chunk-HCIN4FJ4.js?v=c4d88d4a:3678:22)
+    at Object.invokeGuardedCallbackDev (chunk-HCIN4FJ4.js?v=c4d88d4a:3703:24)
+    at invokeGuardedCallback (chunk-HCIN4FJ4.js?v=c4d88d4a:3737:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-HCIN4FJ4.js?v=c4d88d4a:3740:33)
+    at executeDispatch (chunk-HCIN4FJ4.js?v=c4d88d4a:7044:11)
+    at processDispatchQueueItemsInOrder (chunk-HCIN4FJ4.js?v=c4d88d4a:7064:15)
+    at processDispatchQueue (chunk-HCIN4FJ4.js?v=c4d88d4a:7073:13)
+    at dispatchEventsForPlugins (chunk-HCIN4FJ4.js?v=c4d88d4a:7081:11)
+    at chunk-HCIN4FJ4.js?v=c4d88d4a:7204:20
+onClick @ App.tsx:1825
+callCallback2 @ chunk-HCIN4FJ4.js?v=c4d88d4a:3678
+invokeGuardedCallbackDev @ chunk-HCIN4FJ4.js?v=c4d88d4a:3703
+invokeGuardedCallback @ chunk-HCIN4FJ4.js?v=c4d88d4a:3737
+invokeGuardedCallbackAndCatchFirstError @ chunk-HCIN4FJ4.js?v=c4d88d4a:3740
+executeDispatch @ chunk-HCIN4FJ4.js?v=c4d88d4a:7044
+processDispatchQueueItemsInOrder @ chunk-HCIN4FJ4.js?v=c4d88d4a:7064
+processDispatchQueue @ chunk-HCIN4FJ4.js?v=c4d88d4a:7073
+dispatchEventsForPlugins @ chunk-HCIN4FJ4.js?v=c4d88d4a:7081
+(anonymous) @ chunk-HCIN4FJ4.js?v=c4d88d4a:7204
+batchedUpdates$1 @ chunk-HCIN4FJ4.js?v=c4d88d4a:18964
+batchedUpdates @ chunk-HCIN4FJ4.js?v=c4d88d4a:3583
+dispatchEventForPluginEventSystem @ chunk-HCIN4FJ4.js?v=c4d88d4a:7203
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-HCIN4FJ4.js?v=c4d88d4a:5482
+dispatchEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5476
+dispatchDiscreteEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5453
+App.tsx:1825 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'dbPickSqlFile')
+    at onClick (App.tsx:1825:62)
+    at HTMLUnknownElement.callCallback2 (chunk-HCIN4FJ4.js?v=c4d88d4a:3678:22)
+    at Object.invokeGuardedCallbackDev (chunk-HCIN4FJ4.js?v=c4d88d4a:3703:24)
+    at invokeGuardedCallback (chunk-HCIN4FJ4.js?v=c4d88d4a:3737:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-HCIN4FJ4.js?v=c4d88d4a:3740:33)
+    at executeDispatch (chunk-HCIN4FJ4.js?v=c4d88d4a:7044:11)
+    at processDispatchQueueItemsInOrder (chunk-HCIN4FJ4.js?v=c4d88d4a:7064:15)
+    at processDispatchQueue (chunk-HCIN4FJ4.js?v=c4d88d4a:7073:13)
+    at dispatchEventsForPlugins (chunk-HCIN4FJ4.js?v=c4d88d4a:7081:11)
+    at chunk-HCIN4FJ4.js?v=c4d88d4a:7204:20
+onClick @ App.tsx:1825
+callCallback2 @ chunk-HCIN4FJ4.js?v=c4d88d4a:3678
+invokeGuardedCallbackDev @ chunk-HCIN4FJ4.js?v=c4d88d4a:3703
+invokeGuardedCallback @ chunk-HCIN4FJ4.js?v=c4d88d4a:3737
+invokeGuardedCallbackAndCatchFirstError @ chunk-HCIN4FJ4.js?v=c4d88d4a:3740
+executeDispatch @ chunk-HCIN4FJ4.js?v=c4d88d4a:7044
+processDispatchQueueItemsInOrder @ chunk-HCIN4FJ4.js?v=c4d88d4a:7064
+processDispatchQueue @ chunk-HCIN4FJ4.js?v=c4d88d4a:7073
+dispatchEventsForPlugins @ chunk-HCIN4FJ4.js?v=c4d88d4a:7081
+(anonymous) @ chunk-HCIN4FJ4.js?v=c4d88d4a:7204
+batchedUpdates$1 @ chunk-HCIN4FJ4.js?v=c4d88d4a:18964
+batchedUpdates @ chunk-HCIN4FJ4.js?v=c4d88d4a:3583
+dispatchEventForPluginEventSystem @ chunk-HCIN4FJ4.js?v=c4d88d4a:7203
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-HCIN4FJ4.js?v=c4d88d4a:5482
+dispatchEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5476
+dispatchDiscreteEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5453
+App.tsx:1825 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'dbPickSqlFile')
+    at onClick (App.tsx:1825:62)
+    at HTMLUnknownElement.callCallback2 (chunk-HCIN4FJ4.js?v=c4d88d4a:3678:22)
+    at Object.invokeGuardedCallbackDev (chunk-HCIN4FJ4.js?v=c4d88d4a:3703:24)
+    at invokeGuardedCallback (chunk-HCIN4FJ4.js?v=c4d88d4a:3737:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-HCIN4FJ4.js?v=c4d88d4a:3740:33)
+    at executeDispatch (chunk-HCIN4FJ4.js?v=c4d88d4a:7044:11)
+    at processDispatchQueueItemsInOrder (chunk-HCIN4FJ4.js?v=c4d88d4a:7064:15)
+    at processDispatchQueue (chunk-HCIN4FJ4.js?v=c4d88d4a:7073:13)
+    at dispatchEventsForPlugins (chunk-HCIN4FJ4.js?v=c4d88d4a:7081:11)
+    at chunk-HCIN4FJ4.js?v=c4d88d4a:7204:20
+onClick @ App.tsx:1825
+callCallback2 @ chunk-HCIN4FJ4.js?v=c4d88d4a:3678
+invokeGuardedCallbackDev @ chunk-HCIN4FJ4.js?v=c4d88d4a:3703
+invokeGuardedCallback @ chunk-HCIN4FJ4.js?v=c4d88d4a:3737
+invokeGuardedCallbackAndCatchFirstError @ chunk-HCIN4FJ4.js?v=c4d88d4a:3740
+executeDispatch @ chunk-HCIN4FJ4.js?v=c4d88d4a:7044
+processDispatchQueueItemsInOrder @ chunk-HCIN4FJ4.js?v=c4d88d4a:7064
+processDispatchQueue @ chunk-HCIN4FJ4.js?v=c4d88d4a:7073
+dispatchEventsForPlugins @ chunk-HCIN4FJ4.js?v=c4d88d4a:7081
+(anonymous) @ chunk-HCIN4FJ4.js?v=c4d88d4a:7204
+batchedUpdates$1 @ chunk-HCIN4FJ4.js?v=c4d88d4a:18964
+batchedUpdates @ chunk-HCIN4FJ4.js?v=c4d88d4a:3583
+dispatchEventForPluginEventSystem @ chunk-HCIN4FJ4.js?v=c4d88d4a:7203
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-HCIN4FJ4.js?v=c4d88d4a:5482
+dispatchEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5476
+dispatchDiscreteEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5453
+App.tsx:1825 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'dbPickSqlFile')
+    at onClick (App.tsx:1825:62)
+    at HTMLUnknownElement.callCallback2 (chunk-HCIN4FJ4.js?v=c4d88d4a:3678:22)
+    at Object.invokeGuardedCallbackDev (chunk-HCIN4FJ4.js?v=c4d88d4a:3703:24)
+    at invokeGuardedCallback (chunk-HCIN4FJ4.js?v=c4d88d4a:3737:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-HCIN4FJ4.js?v=c4d88d4a:3740:33)
+    at executeDispatch (chunk-HCIN4FJ4.js?v=c4d88d4a:7044:11)
+    at processDispatchQueueItemsInOrder (chunk-HCIN4FJ4.js?v=c4d88d4a:7064:15)
+    at processDispatchQueue (chunk-HCIN4FJ4.js?v=c4d88d4a:7073:13)
+    at dispatchEventsForPlugins (chunk-HCIN4FJ4.js?v=c4d88d4a:7081:11)
+    at chunk-HCIN4FJ4.js?v=c4d88d4a:7204:20
+onClick @ App.tsx:1825
+callCallback2 @ chunk-HCIN4FJ4.js?v=c4d88d4a:3678
+invokeGuardedCallbackDev @ chunk-HCIN4FJ4.js?v=c4d88d4a:3703
+invokeGuardedCallback @ chunk-HCIN4FJ4.js?v=c4d88d4a:3737
+invokeGuardedCallbackAndCatchFirstError @ chunk-HCIN4FJ4.js?v=c4d88d4a:3740
+executeDispatch @ chunk-HCIN4FJ4.js?v=c4d88d4a:7044
+processDispatchQueueItemsInOrder @ chunk-HCIN4FJ4.js?v=c4d88d4a:7064
+processDispatchQueue @ chunk-HCIN4FJ4.js?v=c4d88d4a:7073
+dispatchEventsForPlugins @ chunk-HCIN4FJ4.js?v=c4d88d4a:7081
+(anonymous) @ chunk-HCIN4FJ4.js?v=c4d88d4a:7204
+batchedUpdates$1 @ chunk-HCIN4FJ4.js?v=c4d88d4a:18964
+batchedUpdates @ chunk-HCIN4FJ4.js?v=c4d88d4a:3583
+dispatchEventForPluginEventSystem @ chunk-HCIN4FJ4.js?v=c4d88d4a:7203
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-HCIN4FJ4.js?v=c4d88d4a:5482
+dispatchEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5476
+dispatchDiscreteEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5453
+App.tsx:1825 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'dbPickSqlFile')
+    at onClick (App.tsx:1825:62)
+    at HTMLUnknownElement.callCallback2 (chunk-HCIN4FJ4.js?v=c4d88d4a:3678:22)
+    at Object.invokeGuardedCallbackDev (chunk-HCIN4FJ4.js?v=c4d88d4a:3703:24)
+    at invokeGuardedCallback (chunk-HCIN4FJ4.js?v=c4d88d4a:3737:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-HCIN4FJ4.js?v=c4d88d4a:3740:33)
+    at executeDispatch (chunk-HCIN4FJ4.js?v=c4d88d4a:7044:11)
+    at processDispatchQueueItemsInOrder (chunk-HCIN4FJ4.js?v=c4d88d4a:7064:15)
+    at processDispatchQueue (chunk-HCIN4FJ4.js?v=c4d88d4a:7073:13)
+    at dispatchEventsForPlugins (chunk-HCIN4FJ4.js?v=c4d88d4a:7081:11)
+    at chunk-HCIN4FJ4.js?v=c4d88d4a:7204:20
+onClick @ App.tsx:1825
+callCallback2 @ chunk-HCIN4FJ4.js?v=c4d88d4a:3678
+invokeGuardedCallbackDev @ chunk-HCIN4FJ4.js?v=c4d88d4a:3703
+invokeGuardedCallback @ chunk-HCIN4FJ4.js?v=c4d88d4a:3737
+invokeGuardedCallbackAndCatchFirstError @ chunk-HCIN4FJ4.js?v=c4d88d4a:3740
+executeDispatch @ chunk-HCIN4FJ4.js?v=c4d88d4a:7044
+processDispatchQueueItemsInOrder @ chunk-HCIN4FJ4.js?v=c4d88d4a:7064
+processDispatchQueue @ chunk-HCIN4FJ4.js?v=c4d88d4a:7073
+dispatchEventsForPlugins @ chunk-HCIN4FJ4.js?v=c4d88d4a:7081
+(anonymous) @ chunk-HCIN4FJ4.js?v=c4d88d4a:7204
+batchedUpdates$1 @ chunk-HCIN4FJ4.js?v=c4d88d4a:18964
+batchedUpdates @ chunk-HCIN4FJ4.js?v=c4d88d4a:3583
+dispatchEventForPluginEventSystem @ chunk-HCIN4FJ4.js?v=c4d88d4a:7203
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-HCIN4FJ4.js?v=c4d88d4a:5482
+dispatchEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5476
+dispatchDiscreteEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5453
+App.tsx:1825 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'dbPickSqlFile')
+    at onClick (App.tsx:1825:62)
+    at HTMLUnknownElement.callCallback2 (chunk-HCIN4FJ4.js?v=c4d88d4a:3678:22)
+    at Object.invokeGuardedCallbackDev (chunk-HCIN4FJ4.js?v=c4d88d4a:3703:24)
+    at invokeGuardedCallback (chunk-HCIN4FJ4.js?v=c4d88d4a:3737:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-HCIN4FJ4.js?v=c4d88d4a:3740:33)
+    at executeDispatch (chunk-HCIN4FJ4.js?v=c4d88d4a:7044:11)
+    at processDispatchQueueItemsInOrder (chunk-HCIN4FJ4.js?v=c4d88d4a:7064:15)
+    at processDispatchQueue (chunk-HCIN4FJ4.js?v=c4d88d4a:7073:13)
+    at dispatchEventsForPlugins (chunk-HCIN4FJ4.js?v=c4d88d4a:7081:11)
+    at chunk-HCIN4FJ4.js?v=c4d88d4a:7204:20
+onClick @ App.tsx:1825
+callCallback2 @ chunk-HCIN4FJ4.js?v=c4d88d4a:3678
+invokeGuardedCallbackDev @ chunk-HCIN4FJ4.js?v=c4d88d4a:3703
+invokeGuardedCallback @ chunk-HCIN4FJ4.js?v=c4d88d4a:3737
+invokeGuardedCallbackAndCatchFirstError @ chunk-HCIN4FJ4.js?v=c4d88d4a:3740
+executeDispatch @ chunk-HCIN4FJ4.js?v=c4d88d4a:7044
+processDispatchQueueItemsInOrder @ chunk-HCIN4FJ4.js?v=c4d88d4a:7064
+processDispatchQueue @ chunk-HCIN4FJ4.js?v=c4d88d4a:7073
+dispatchEventsForPlugins @ chunk-HCIN4FJ4.js?v=c4d88d4a:7081
+(anonymous) @ chunk-HCIN4FJ4.js?v=c4d88d4a:7204
+batchedUpdates$1 @ chunk-HCIN4FJ4.js?v=c4d88d4a:18964
+batchedUpdates @ chunk-HCIN4FJ4.js?v=c4d88d4a:3583
+dispatchEventForPluginEventSystem @ chunk-HCIN4FJ4.js?v=c4d88d4a:7203
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-HCIN4FJ4.js?v=c4d88d4a:5482
+dispatchEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5476
+dispatchDiscreteEvent @ chunk-HCIN4FJ4.js?v=c4d88d4a:5453

@@ -1,12 +1,83 @@
 import { ipcMain, dialog } from 'electron'
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve as resolvePath } from 'node:path'
 import Database from 'better-sqlite3'
 import { createConnection as createMySqlConnection, Connection as MySqlConnection } from 'mysql2/promise'
 import { Client as PgClient } from 'pg'
-import { ConnectionPool as MssqlPool, config as MssqlConfig } from 'mssql'
+import mssql from 'mssql'
+
+function runCapture(command: string, args: string[]): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const proc = spawn(command, args, { windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    proc.stdout?.on('data', (d) => (stdout += String(d)))
+    proc.stderr?.on('data', (d) => (stderr += String(d)))
+    proc.on('close', (code) => resolve({ code, stdout, stderr }))
+    proc.on('error', () => resolve({ code: 1, stdout: '', stderr: 'spawn error' }))
+  })
+}
+
+async function detectMysqlExe(): Promise<string | null> {
+  const candidates: string[] = []
+
+  const addExeIfExists = (p: string) => {
+    if (p && existsSync(p)) candidates.push(p)
+  }
+
+  const addMysqlBinsFromDir = (baseDir: string) => {
+    try {
+      if (!existsSync(baseDir)) return
+      const children = readdirSync(baseDir)
+      for (const name of children) {
+        const full = `${baseDir}\\${name}`
+        try {
+          const st = statSync(full)
+          if (!st.isDirectory()) continue
+        } catch {
+          continue
+        }
+        addExeIfExists(`${full}\\bin\\mysql.exe`)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (process.platform === 'win32') {
+    const where = await runCapture('where', ['mysql'])
+    if (where.code === 0 && where.stdout.trim()) {
+      candidates.push(
+        ...where.stdout
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+    }
+
+    // Common MySQL install locations
+    addExeIfExists('C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe')
+    addExeIfExists('C:\\Program Files\\MySQL\\MySQL Server 5.7\\bin\\mysql.exe')
+    addExeIfExists('C:\\Program Files\\MariaDB\\bin\\mysql.exe')
+    addExeIfExists('C:\\Program Files (x86)\\MariaDB\\bin\\mysql.exe')
+
+    // Wider scan across common install roots
+    addMysqlBinsFromDir('C:\\Program Files\\MySQL')
+    addMysqlBinsFromDir('C:\\Program Files (x86)\\MySQL')
+    addMysqlBinsFromDir('C:\\Program Files\\MariaDB')
+    addMysqlBinsFromDir('C:\\Program Files (x86)\\MariaDB')
+  } else {
+    const which = await runCapture('which', ['mysql'])
+    if (which.code === 0 && which.stdout.trim()) candidates.push(which.stdout.trim())
+  }
+
+  for (const c of candidates) {
+    if (c && existsSync(c)) return c
+  }
+  return null
+}
 
 // Database engine types
 type DbEngine = 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'
@@ -16,6 +87,9 @@ type SqliteConfig = { path: string }
 type MySqlConfig = { host: string; port: number; user: string; password: string; database?: string }
 type PostgreSqlConfig = { host: string; port: number; user: string; password: string; database?: string }
 type SqlServerConfig = { server: string; port: number; user: string; password: string; database?: string }
+
+type MssqlPool = mssql.ConnectionPool
+type MssqlConfig = mssql.config
 
 type DbConfig =
   | { engine: 'sqlite'; config: SqliteConfig }
@@ -84,6 +158,105 @@ class SQLiteAdapter {
     const stmt = this.db.prepare(`PRAGMA table_info(${tableName})`)
     return stmt.all()
   }
+
+  async exportToTxt(exportDir: string): Promise<{ exported: number; files: string[] }> {
+    if (!this.db) throw new Error('Not connected')
+    const tables = await this.listTables()
+    const files: string[] = []
+    
+    for (const table of tables) {
+      const outFile = `${exportDir}/${table}.txt`
+      let content = `=== SCHEMA: ${table} ===\n\n`
+      
+      // Get CREATE TABLE statement
+      const schemaStmt = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
+      const schemaRow = schemaStmt.get(table) as { sql: string } | undefined
+      if (schemaRow?.sql) {
+        content += schemaRow.sql + '\n\n'
+      }
+      
+      // Get sample data (first 50 rows)
+      content += `=== SAMPLE DATA (First 50 rows) ===\n\n`
+      const dataStmt = this.db.prepare(`SELECT * FROM ${table} LIMIT 50`)
+      const rows = dataStmt.all() as Record<string, unknown>[]
+      
+      if (rows.length > 0) {
+        // Header
+        const columns = Object.keys(rows[0])
+        content += columns.join('\t') + '\n'
+        content += columns.map(() => '---').join('\t') + '\n'
+        
+        // Data rows
+        for (const row of rows) {
+          content += columns.map(c => String(row[c] ?? 'NULL')).join('\t') + '\n'
+        }
+      } else {
+        content += '(no data)\n'
+      }
+      
+      writeFileSync(outFile, content, 'utf-8')
+      files.push(outFile)
+    }
+    
+    return { exported: files.length, files }
+  }
+}
+
+function filterSqlForTablesBySemicolon(sqlContent: string, tableNames: string[]): string[] {
+  const wanted = new Set(tableNames.map((t) => t.trim()).filter(Boolean))
+  const statements = sqlContent.split(';').map((s) => s.trim()).filter(Boolean)
+  if (wanted.size === 0) return []
+
+  const matchesTable = (stmt: string) => {
+    const s = stmt.toLowerCase()
+    for (const t of wanted) {
+      const tl = t.toLowerCase()
+      if (
+        s.includes(`create table \`${tl}\``) ||
+        s.includes(`create table ${tl}`) ||
+        s.includes(`insert into \`${tl}\``) ||
+        s.includes(`insert into ${tl}`) ||
+        s.includes(`alter table \`${tl}\``) ||
+        s.includes(`alter table ${tl}`) ||
+        s.includes(`drop table \`${tl}\``) ||
+        s.includes(`drop table ${tl}`)
+      ) {
+        return true
+      }
+    }
+    return false
+  }
+
+  return statements.filter(matchesTable)
+}
+
+function filterSqlForTablesByGo(sqlContent: string, tableNames: string[]): string[] {
+  const wanted = new Set(tableNames.map((t) => t.trim()).filter(Boolean))
+  const batches = sqlContent
+    .split(/\r?\n\s*GO\s*\r?\n/i)
+    .map((b) => b.trim())
+    .filter(Boolean)
+  if (wanted.size === 0) return []
+
+  const matchesTable = (batch: string) => {
+    const s = batch.toLowerCase()
+    for (const t of wanted) {
+      const tl = t.toLowerCase()
+      if (
+        s.includes(`create table [${tl}]`) ||
+        s.includes(`insert into [${tl}]`) ||
+        s.includes(`alter table [${tl}]`) ||
+        s.includes(`drop table [${tl}]`) ||
+        s.includes(`create table ${tl}`) ||
+        s.includes(`insert into ${tl}`)
+      ) {
+        return true
+      }
+    }
+    return false
+  }
+
+  return batches.filter(matchesTable)
 }
 
 // ============== MYSQL ADAPTER ==============
@@ -156,6 +329,46 @@ class MySQLAdapter {
     if (!this.connection) throw new Error('Not connected')
     const [rows] = await this.connection.execute(`DESCRIBE ${tableName}`)
     return rows as unknown[]
+  }
+
+  async exportToTxt(exportDir: string): Promise<{ exported: number; files: string[] }> {
+    if (!this.connection) throw new Error('Not connected')
+
+    const tables = await this.listTables()
+    const files: string[] = []
+
+    for (const table of tables) {
+      const outFile = `${exportDir}/${table}.txt`
+      let content = `=== SCHEMA: ${table} ===\n\n`
+
+      // Schema via SHOW CREATE TABLE
+      const [schemaRows] = await this.connection.execute(`SHOW CREATE TABLE \`${table.replace(/`/g, '``')}\``)
+      const sr = schemaRows as Array<Record<string, unknown>>
+      const createKey = sr[0] ? (Object.keys(sr[0]).find((k) => k.toLowerCase().includes('create table')) ?? '') : ''
+      if (sr[0] && createKey && typeof sr[0][createKey] === 'string') {
+        content += String(sr[0][createKey]) + '\n\n'
+      }
+
+      // Sample data
+      content += `=== SAMPLE DATA (First 50 rows) ===\n\n`
+      const [dataRows] = await this.connection.execute(`SELECT * FROM \`${table.replace(/`/g, '``')}\` LIMIT 50`)
+      const dr = dataRows as Array<Record<string, unknown>>
+      if (dr.length > 0) {
+        const columns = Object.keys(dr[0])
+        content += columns.join('\t') + '\n'
+        content += columns.map(() => '---').join('\t') + '\n'
+        for (const row of dr) {
+          content += columns.map((c) => String((row as Record<string, unknown>)[c] ?? 'NULL')).join('\t') + '\n'
+        }
+      } else {
+        content += '(no data)\n'
+      }
+
+      writeFileSync(outFile, content, 'utf-8')
+      files.push(outFile)
+    }
+
+    return { exported: files.length, files }
   }
 }
 
@@ -232,6 +445,53 @@ class PostgreSQLAdapter {
     )
     return result.rows
   }
+
+  async exportToTxt(exportDir: string): Promise<{ exported: number; files: string[] }> {
+    if (!this.client) throw new Error('Not connected')
+
+    const tables = await this.listTables()
+    const files: string[] = []
+
+    for (const table of tables) {
+      const safeName = table.replace(/[\/]/g, '_')
+      const outFile = `${exportDir}/${safeName}.txt`
+      let content = `=== SCHEMA: ${table} ===\n\n`
+
+      // Schema (best-effort) from information_schema
+      const schema = await this.client.query(
+        `SELECT column_name, data_type, is_nullable, column_default
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1
+         ORDER BY ordinal_position`,
+        [table]
+      )
+      content += 'Columns:\n'
+      for (const r of schema.rows as Array<Record<string, unknown>>) {
+        content += `- ${String(r.column_name)} ${String(r.data_type)} NULLABLE=${String(r.is_nullable)} DEFAULT=${String(r.column_default ?? '')}\n`
+      }
+      content += '\n'
+
+      // Sample data
+      content += `=== SAMPLE DATA (First 50 rows) ===\n\n`
+      const data = await this.client.query(`SELECT * FROM "public"."${table.replace(/"/g, '""')}" LIMIT 50`)
+      const dr = data.rows as Array<Record<string, unknown>>
+      if (dr.length > 0) {
+        const columns = Object.keys(dr[0])
+        content += columns.join('\t') + '\n'
+        content += columns.map(() => '---').join('\t') + '\n'
+        for (const row of dr) {
+          content += columns.map((c) => String(row[c] ?? 'NULL')).join('\t') + '\n'
+        }
+      } else {
+        content += '(no data)\n'
+      }
+
+      writeFileSync(outFile, content, 'utf-8')
+      files.push(outFile)
+    }
+
+    return { exported: files.length, files }
+  }
 }
 
 // ============== SQL SERVER ADAPTER ==============
@@ -257,8 +517,9 @@ class SQLServerAdapter {
         },
         connectionTimeout: 10000,
       }
-      this.pool = new MssqlPool(config)
-      await this.pool.connect()
+      const pool = new mssql.ConnectionPool(config)
+      await pool.connect()
+      this.pool = pool
       return true
     } catch (error) {
       throw new Error(`SQL Server connection failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -316,6 +577,49 @@ class SQLServerAdapter {
     )
     return result.recordset || []
   }
+
+  async exportToTxt(exportDir: string): Promise<{ exported: number; files: string[] }> {
+    if (!this.pool) throw new Error('Not connected')
+
+    const tables = await this.listTables()
+    const files: string[] = []
+
+    for (const table of tables) {
+      const safeName = table.replace(/[\/]/g, '_')
+      const outFile = `${exportDir}/${safeName}.txt`
+      let content = `=== SCHEMA: ${table} ===\n\n`
+
+      const schema = await this.pool.query(
+        `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_NAME = '${table.replace(/'/g, "''")}';`
+      )
+      content += 'Columns:\n'
+      for (const r of (schema.recordset as Array<Record<string, unknown>>)) {
+        content += `- ${String(r.COLUMN_NAME)} ${String(r.DATA_TYPE)} NULLABLE=${String(r.IS_NULLABLE)} DEFAULT=${String(r.COLUMN_DEFAULT ?? '')}\n`
+      }
+      content += '\n'
+
+      content += `=== SAMPLE DATA (First 50 rows) ===\n\n`
+      const data = await this.pool.query(`SELECT TOP 50 * FROM [${table.replace(/]/g, ']]')}]`)
+      const dr = (data.recordset as Array<Record<string, unknown>>) || []
+      if (dr.length > 0) {
+        const columns = Object.keys(dr[0])
+        content += columns.join('\t') + '\n'
+        content += columns.map(() => '---').join('\t') + '\n'
+        for (const row of dr) {
+          content += columns.map((c) => String(row[c] ?? 'NULL')).join('\t') + '\n'
+        }
+      } else {
+        content += '(no data)\n'
+      }
+
+      writeFileSync(outFile, content, 'utf-8')
+      files.push(outFile)
+    }
+
+    return { exported: files.length, files }
+  }
 }
 
 // ============== CONNECTION MANAGER ==============
@@ -330,6 +634,133 @@ function getConnectionKey(config: DbConfig): string {
     case 'sqlserver':
       return `sqlserver:${config.config.server}:${config.config.port}:${config.config.database || ''}`
   }
+}
+
+// Scan SQL file for table names
+function scanSqlFileForTables(sqlFilePath: string): string[] {
+  try {
+    const content = readFileSync(sqlFilePath, 'utf-8')
+    // Find CREATE TABLE statements - matches patterns like CREATE TABLE `tablename` or CREATE TABLE tablename
+    const tableRegex = /CREATE TABLE\s+[`"']?(\w+)[`"']?/gi
+    const tables: string[] = []
+    let match
+    while ((match = tableRegex.exec(content)) !== null) {
+      if (!tables.includes(match[1])) {
+        tables.push(match[1])
+      }
+    }
+    return tables
+  } catch {
+    return []
+  }
+}
+
+// Import SQL file
+async function importSqlFile(key: string, sqlFilePath: string): Promise<{ success: boolean; tables: string[]; message: string }> {
+  const conn = activeConnections.get(key)
+  if (!conn) throw new Error('Not connected')
+
+  const tables = scanSqlFileForTables(sqlFilePath)
+  if (tables.length === 0) {
+    return { success: false, tables: [], message: 'No tables found in SQL file' }
+  }
+
+  const content = readFileSync(sqlFilePath, 'utf-8')
+
+  // Execute full import (best-effort parsing; does not handle all SQL dialect edge cases)
+  if (conn.engine === 'sqlite') {
+    const adapter = conn.connection as SQLiteAdapter
+    const statements = content.split(';').filter((s) => s.trim())
+    for (const stmt of statements) {
+      if (stmt.trim()) await adapter.execute(stmt)
+    }
+    return { success: true, tables, message: `Imported ${tables.length} tables` }
+  }
+
+  if (conn.engine === 'mysql') {
+    const adapter = conn.connection as MySQLAdapter
+    const statements = content.split(';').filter((s) => s.trim())
+    for (const stmt of statements) {
+      if (stmt.trim()) await adapter.execute(stmt)
+    }
+    return { success: true, tables, message: `Imported ${tables.length} tables` }
+  }
+
+  if (conn.engine === 'postgresql') {
+    const adapter = conn.connection as PostgreSQLAdapter
+    const statements = content.split(';').filter((s) => s.trim())
+    for (const stmt of statements) {
+      if (stmt.trim()) await adapter.execute(stmt)
+    }
+    return { success: true, tables, message: `Imported ${tables.length} tables` }
+  }
+
+  if (conn.engine === 'sqlserver') {
+    const adapter = conn.connection as SQLServerAdapter
+    const batches = content
+      .split(/\r?\n\s*GO\s*\r?\n/i)
+      .map((b) => b.trim())
+      .filter(Boolean)
+    for (const batch of batches) {
+      if (batch.trim()) await adapter.execute(batch)
+    }
+    return { success: true, tables, message: `Imported ${tables.length} tables` }
+  }
+
+  return { success: false, tables, message: 'Import not supported for this database engine' }
+}
+
+async function importSqlFileSelective(
+  key: string,
+  sqlFilePath: string,
+  tableNames: string[]
+): Promise<{ success: boolean; tables: string[]; message: string }> {
+  const conn = activeConnections.get(key)
+  if (!conn) throw new Error('Not connected')
+
+  const allTables = scanSqlFileForTables(sqlFilePath)
+  const selected = (tableNames || []).map((t) => t.trim()).filter(Boolean)
+  const selectedValid = selected.filter((t) => allTables.includes(t))
+  if (selectedValid.length === 0) {
+    return { success: false, tables: [], message: 'No selected tables found in SQL file' }
+  }
+
+  const content = readFileSync(sqlFilePath, 'utf-8')
+
+  if (conn.engine === 'sqlserver') {
+    const adapter = conn.connection as SQLServerAdapter
+    const batches = filterSqlForTablesByGo(content, selectedValid)
+    for (const batch of batches) {
+      if (batch.trim()) await adapter.execute(batch)
+    }
+    return { success: true, tables: selectedValid, message: `Selective restore imported ${selectedValid.length} tables` }
+  }
+
+  // sqlite/mysql/postgresql
+  const statements = filterSqlForTablesBySemicolon(content, selectedValid)
+  if (conn.engine === 'sqlite') {
+    const adapter = conn.connection as SQLiteAdapter
+    for (const stmt of statements) {
+      if (stmt.trim()) await adapter.execute(stmt)
+    }
+    return { success: true, tables: selectedValid, message: `Selective restore imported ${selectedValid.length} tables` }
+  }
+  if (conn.engine === 'mysql') {
+    const adapter = conn.connection as MySQLAdapter
+    for (const stmt of statements) {
+      if (stmt.trim()) await adapter.execute(stmt)
+    }
+    return { success: true, tables: selectedValid, message: `Selective restore imported ${selectedValid.length} tables` }
+  }
+  if (conn.engine === 'postgresql') {
+    const adapter = conn.connection as PostgreSQLAdapter
+    for (const stmt of statements) {
+      if (stmt.trim()) await adapter.execute(stmt)
+    }
+    return { success: true, tables: selectedValid, message: `Selective restore imported ${selectedValid.length} tables` }
+  }
+
+  return { success: false, tables: selectedValid, message: 'Selective restore not supported for this database engine' }
 }
 
 async function connectDatabase(config: DbConfig): Promise<{ ok: boolean; key: string; error?: string }> {
@@ -428,6 +859,15 @@ async function getTableInfo(key: string, tableName: string): Promise<unknown[]> 
   return await adapter.getTableInfo(tableName)
 }
 
+async function exportDatabaseToTxt(key: string, exportDir: string): Promise<{ exported: number; files: string[] }> {
+  const conn = activeConnections.get(key)
+  if (!conn) throw new Error('Not connected')
+
+  const adapter = conn.connection as SQLiteAdapter | MySQLAdapter | PostgreSQLAdapter | SQLServerAdapter
+  if ('exportToTxt' in adapter) return await adapter.exportToTxt(exportDir)
+  throw new Error('Export not supported for this database engine')
+}
+
 // ============== IPC REGISTRATION ==============
 export function registerDatabaseIpc() {
   ipcMain.handle('db:connect', async (_event, config: DbConfig) => {
@@ -458,6 +898,43 @@ export function registerDatabaseIpc() {
     return await getTableInfo(key, tableName)
   })
 
+  ipcMain.handle('db:pick-export-dir', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select export directory',
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('db:export-to-txt', async (_event, key: string, exportDir: string) => {
+    return await exportDatabaseToTxt(key, exportDir)
+  })
+
+  ipcMain.handle('db:pick-sql-file', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      title: 'Select SQL file to import',
+      filters: [{ name: 'SQL Files', extensions: ['sql'] }, { name: 'All Files', extensions: ['*'] }],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('db:scan-sql-tables', async (_event, sqlFilePath: string) => {
+    return scanSqlFileForTables(sqlFilePath)
+  })
+
+  ipcMain.handle('db:import-sql', async (_event, key: string, sqlFilePath: string) => {
+    return await importSqlFile(key, sqlFilePath)
+  })
+
+  ipcMain.handle('db:import-sql-selective', async (_event, key: string, sqlFilePath: string, tableNames: string[]) => {
+    return await importSqlFileSelective(key, sqlFilePath, tableNames)
+  })
+
   ipcMain.handle('db:pick-sqlite', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
@@ -467,6 +944,21 @@ export function registerDatabaseIpc() {
 
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
+  })
+
+  ipcMain.handle('db:pick-mysql-exe', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      title: 'Select mysql.exe',
+      filters: [{ name: 'Executable', extensions: ['exe'] }, { name: 'All Files', extensions: ['*'] }],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('db:detect-mysql-exe', async () => {
+    return await detectMysqlExe()
   })
 
   ipcMain.handle('db:test-connection', async (_event, config: DbConfig) => {

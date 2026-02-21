@@ -1,7 +1,15 @@
-import { ipcMain, shell } from 'electron';
-import { watch } from 'node:fs';
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.registerDebugIpc = registerDebugIpc;
+exports.detectLaravelLog = detectLaravelLog;
+exports.readLogFile = readLogFile;
+exports.watchLogFile = watchLogFile;
+exports.stopWatching = stopWatching;
+exports.openLogFile = openLogFile;
+const electron_1 = require("electron");
+const node_fs_1 = require("node:fs");
+const node_fs_2 = require("node:fs");
+const node_path_1 = require("node:path");
 // Track active file watchers
 const activeWatchers = new Map();
 // Store last known content to detect changes
@@ -11,24 +19,24 @@ const lastKnownContent = new Map();
  * Looks for storage/logs/laravel.log or dated log files
  */
 function detectLaravelLog(repoPath) {
-    const logsDir = join(repoPath, 'storage', 'logs');
-    if (!existsSync(logsDir)) {
+    const logsDir = (0, node_path_1.join)(repoPath, 'storage', 'logs');
+    if (!(0, node_fs_2.existsSync)(logsDir)) {
         return null;
     }
     // Primary: laravel.log
-    const primaryLog = join(logsDir, 'laravel.log');
-    if (existsSync(primaryLog)) {
+    const primaryLog = (0, node_path_1.join)(logsDir, 'laravel.log');
+    if ((0, node_fs_2.existsSync)(primaryLog)) {
         return primaryLog;
     }
     // Secondary: dated log files (laravel-YYYY-MM-DD.log)
     try {
-        const files = readdirSync(logsDir);
+        const files = (0, node_fs_2.readdirSync)(logsDir);
         const logFiles = files
             .filter(f => f.startsWith('laravel-') && f.endsWith('.log'))
             .map(f => ({
             name: f,
-            path: join(logsDir, f),
-            mtime: statSync(join(logsDir, f)).mtime.getTime()
+            path: (0, node_path_1.join)(logsDir, f),
+            mtime: (0, node_fs_2.statSync)((0, node_path_1.join)(logsDir, f)).mtime.getTime()
         }))
             .sort((a, b) => b.mtime - a.mtime);
         if (logFiles.length > 0) {
@@ -40,10 +48,10 @@ function detectLaravelLog(repoPath) {
     }
     // Fallback: any .log file in the directory
     try {
-        const files = readdirSync(logsDir);
+        const files = (0, node_fs_2.readdirSync)(logsDir);
         const anyLog = files.find(f => f.endsWith('.log'));
         if (anyLog) {
-            return join(logsDir, anyLog);
+            return (0, node_path_1.join)(logsDir, anyLog);
         }
     }
     catch {
@@ -87,7 +95,7 @@ function parseLogLevel(line) {
  * Read and parse log file
  */
 function readLogFile(filePath, maxLines = 500) {
-    if (!existsSync(filePath)) {
+    if (!(0, node_fs_2.existsSync)(filePath)) {
         return {
             lines: [],
             summary: { errors: 0, warnings: 0, info: 0, debug: 0, total: 0 },
@@ -96,7 +104,7 @@ function readLogFile(filePath, maxLines = 500) {
         };
     }
     try {
-        const content = readFileSync(filePath, 'utf-8');
+        const content = (0, node_fs_2.readFileSync)(filePath, 'utf-8');
         const allLines = content.split('\n');
         // Show only last maxLines to avoid performance issues
         const truncated = allLines.length > maxLines;
@@ -144,7 +152,7 @@ function watchLogFile(repoPath, callback) {
     lastKnownContent.set(repoPath, initialResult.lines.map(l => l.text).join('\n'));
     callback(initialResult);
     // Start watching
-    const watcher = watch(logPath, (eventType) => {
+    const watcher = (0, node_fs_1.watch)(logPath, (eventType) => {
         if (eventType === 'change') {
             const result = readLogFile(logPath);
             const newContent = result.lines.map(l => l.text).join('\n');
@@ -173,11 +181,11 @@ function stopWatching(repoPath) {
  * Open log file in default editor
  */
 function openLogFile(filePath) {
-    if (!existsSync(filePath)) {
+    if (!(0, node_fs_2.existsSync)(filePath)) {
         return false;
     }
     try {
-        shell.openPath(filePath);
+        electron_1.shell.openPath(filePath);
         return true;
     }
     catch {
@@ -187,13 +195,13 @@ function openLogFile(filePath) {
 /**
  * Register debug IPC handlers
  */
-export function registerDebugIpc() {
+function registerDebugIpc() {
     // Detect log file
-    ipcMain.handle('debug:detect-log', async (_event, repoPath) => {
+    electron_1.ipcMain.handle('debug:detect-log', async (_event, repoPath) => {
         return detectLaravelLog(repoPath);
     });
     // Read log file (one-time)
-    ipcMain.handle('debug:read-log', async (_event, repoPath) => {
+    electron_1.ipcMain.handle('debug:read-log', async (_event, repoPath) => {
         const logPath = detectLaravelLog(repoPath);
         if (!logPath) {
             return {
@@ -207,7 +215,7 @@ export function registerDebugIpc() {
     });
     // Start watching log file
     // Returns a promise that resolves when file is found, then sends updates via events
-    ipcMain.handle('debug:watch-start', async (event, repoPath) => {
+    electron_1.ipcMain.handle('debug:watch-start', async (event, repoPath) => {
         const logPath = watchLogFile(repoPath, (result) => {
             // Send update to renderer
             event.sender.send('debug:update', result);
@@ -218,13 +226,12 @@ export function registerDebugIpc() {
         };
     });
     // Stop watching
-    ipcMain.handle('debug:watch-stop', async (_event, repoPath) => {
+    electron_1.ipcMain.handle('debug:watch-stop', async (_event, repoPath) => {
         stopWatching(repoPath);
         return true;
     });
     // Open log file externally
-    ipcMain.handle('debug:open-log', async (_event, filePath) => {
+    electron_1.ipcMain.handle('debug:open-log', async (_event, filePath) => {
         return openLogFile(filePath);
     });
 }
-export { detectLaravelLog, readLogFile, watchLogFile, stopWatching, openLogFile };

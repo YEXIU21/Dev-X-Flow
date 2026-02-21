@@ -1,6 +1,14 @@
 export {}
 
 declare global {
+  interface ImportMetaEnv {
+    readonly DEV: boolean
+  }
+
+  interface ImportMeta {
+    readonly env: ImportMetaEnv
+  }
+
   interface Window {
     devxflow: {
       version: string
@@ -38,6 +46,7 @@ declare global {
           author_email: string
         }[]
       >
+      getLogGraph: (repoPath: string, maxCount: number) => Promise<string>
       getCommitDetails: (repoPath: string, hash: string) => Promise<string>
       getRemotes: (repoPath: string) => Promise<
         {
@@ -51,7 +60,10 @@ declare global {
       pull: (repoPath: string, mode: 'merge' | 'rebase') => Promise<string>
       push: (repoPath: string, branch?: string) => Promise<string>
       stageAll: (repoPath: string) => Promise<boolean>
+      initRepo: (repoPath: string) => Promise<boolean>
+      createBranch: (repoPath: string, branch: string) => Promise<boolean>
       switchBranch: (repoPath: string, branch: string) => Promise<boolean>
+      deleteBranch: (repoPath: string, branch: string) => Promise<boolean>
       merge: (repoPath: string, branch: string) => Promise<boolean>
       getGitAuthor: () => Promise<{ name: string; email: string }>
       setGitAuthor: (name: string, email: string) => Promise<boolean>
@@ -135,7 +147,15 @@ declare global {
       dbListTables: (key: string) => Promise<string[]>
       dbListDatabases: (key: string) => Promise<string[]>
       dbTableInfo: (key: string, tableName: string) => Promise<unknown[]>
+      dbPickExportDir: () => Promise<string | null>
+      dbExportToTxt: (key: string, exportDir: string) => Promise<{ exported: number; files: string[] }>
+      dbPickSqlFile: () => Promise<string | null>
+      dbScanSqlTables: (sqlFilePath: string) => Promise<string[]>
+      dbImportSql: (key: string, sqlFilePath: string) => Promise<{ success: boolean; tables: string[]; message: string }>
+      dbImportSqlSelective: (key: string, sqlFilePath: string, tableNames: string[]) => Promise<{ success: boolean; tables: string[]; message: string }>
       dbPickSqlite: () => Promise<string | null>
+      dbPickMysqlExe: () => Promise<string | null>
+      dbDetectMysqlExe: () => Promise<string | null>
       dbTestConnection: (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }) => Promise<{ ok: boolean; error?: string }>
     }
   }

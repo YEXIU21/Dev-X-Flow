@@ -62,6 +62,8 @@ export function App() {
   >([])
   const [activeCommit, setActiveCommit] = useState<string | null>(null)
   const [commitDetails, setCommitDetails] = useState<string>('')
+  const [historyGraph, setHistoryGraph] = useState<string>('')
+  const [showHistoryGraph, setShowHistoryGraph] = useState<boolean>(true)
   const [remoteBusy, setRemoteBusy] = useState(false)
   const [remotes, setRemotes] = useState<{ name: string; fetch: string; push: string }[]>([])
   const [remoteName, setRemoteName] = useState('origin')
@@ -107,6 +109,8 @@ export function App() {
   const [dbConnectedPath, setDbConnectedPath] = useState<string | null>(null)
   const [dbSql, setDbSql] = useState('select 1 as ok;')
   const [dbResult, setDbResult] = useState<string>('')
+  const [dbSqlFile, setDbSqlFile] = useState<string>('')
+  const [dbSqlTables, setDbSqlTables] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   // Dialog visibility states
   const [showBranchDialog, setShowBranchDialog] = useState(false)
@@ -340,8 +344,12 @@ export function App() {
     setError(null)
     setHistoryBusy(true)
     try {
-      const items = await window.devxflow.getLog(repoPath, historyCount)
+      const [items, graph] = await Promise.all([
+        window.devxflow.getLog(repoPath, historyCount),
+        window.devxflow.getLogGraph(repoPath, historyCount)
+      ])
       setLogItems(items)
+      setHistoryGraph(graph)
       if (items.length > 0 && !activeCommit) {
         setActiveCommit(items[0].hash)
         const details = await window.devxflow.getCommitDetails(repoPath, items[0].hash)
@@ -663,12 +671,31 @@ const runStashAction = async (action: () => Promise<string>) => {
     try {
       const p = dbConnectedPath || dbPath
       const res = await window.devxflow.queryDb(p, dbSql)
-      setDbResult(JSON.stringify(res, null, 2))
+      // Format as table-like output for better readability
+      if (res.rows && res.rows.length > 0) {
+        const columns = Object.keys(res.rows[0] as Record<string, unknown>)
+        let output = `Query returned ${res.rows.length} row(s):\n\n`
+        output += columns.join('\t') + '\n'
+        output += columns.map(() => '---').join('\t') + '\n'
+        for (const row of res.rows) {
+          const r = row as Record<string, unknown>
+          output += columns.map(c => String(r[c] ?? 'NULL')).join('\t') + '\n'
+        }
+        setDbResult(output)
+      } else {
+        setDbResult('Query executed successfully. No rows returned.')
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      setDbResult('')
     } finally {
       setDbBusy(false)
     }
+  }
+
+  const handleClearSql = () => {
+    setDbSql('')
+    setDbResult('')
   }
 
   const handleStageAll = async () => {
@@ -753,6 +780,63 @@ const runStashAction = async (action: () => Promise<string>) => {
     }
   }
 
+  const handleDbExport = async () => {
+    setError(null)
+    setDbBusy(true)
+    try {
+      const exportDir = await window.devxflow.dbPickExportDir()
+      if (!exportDir) {
+        setDbBusy(false)
+        return
+      }
+      const p = dbConnectedPath || dbPath
+      const result = await window.devxflow.dbExportToTxt(p, exportDir)
+      setDbResult(`Exported ${result.exported} tables to:\n${result.files.join('\n')}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  const handleDbPickSqlFile = async () => {
+    setError(null)
+    try {
+      const file = await window.devxflow.dbPickSqlFile()
+      if (file) {
+        setDbSqlFile(file)
+        // Scan for tables
+        const tables = await window.devxflow.dbScanSqlTables(file)
+        setDbSqlTables(tables)
+        setDbResult(`SQL file selected: ${file}\nFound ${tables.length} table(s): ${tables.join(', ')}`)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const handleDbImportSql = async () => {
+    if (!dbSqlFile) {
+      setError('Please select an SQL file first')
+      return
+    }
+    setError(null)
+    setDbBusy(true)
+    try {
+      const p = dbConnectedPath || dbPath
+      const result = await window.devxflow.dbImportSql(p, dbSqlFile)
+      if (result.success) {
+        setDbResult(`✅ Import successful!\nImported ${result.tables.length} table(s): ${result.tables.join(', ')}`)
+      } else {
+        setError(result.message)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
   const panelTitle = useMemo(() => {
     switch (activeTab) {
       case 'Status & Commit':
@@ -788,6 +872,17 @@ const runStashAction = async (action: () => Promise<string>) => {
       </header>
 
       <div className="main-container">
+        {error && (
+          <div className="app-notice app-notice-error">
+            <div className="app-notice-content">
+              <span className="app-notice-icon">⚠️</span>
+              <span className="app-notice-text">{error}</span>
+            </div>
+            <button className="app-notice-close" onClick={() => setError(null)} title="Dismiss">
+              ✕
+            </button>
+          </div>
+        )}
         {/* Repository Path Section - matches Python GUI */}
         <div className="repo-section">
           <div className="section-label">REPOSITORY PATH</div>
@@ -916,8 +1011,6 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </div>
                 </div>
               </div>
-
-              {error ? <div className="panel-error">{error}</div> : null}
             </div>
           ) : activeTab === 'History' ? (
               <div className="history-grid">
@@ -930,41 +1023,54 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                     placeholder="50"
                     inputMode="numeric"
                   />
+                  <button
+                    type="button"
+                    className={showHistoryGraph ? 'btn btn-primary' : 'btn'}
+                    onClick={() => setShowHistoryGraph(!showHistoryGraph)}
+                  >
+                    {showHistoryGraph ? '📊 Graph' : '📋 List'}
+                  </button>
                   <button type="button" className="btn btn-primary" onClick={refreshHistory} disabled={historyBusy || !repoPath}>
                     {historyBusy ? 'Loading…' : 'Refresh'}
                   </button>
                 </div>
 
-                <div className="history-split">
-                  <div className="history-list" aria-label="Commit list">
-                    {logItems.length === 0 ? (
-                      <div className="changes-empty">No commits loaded. Click Refresh.</div>
-                    ) : (
-                      logItems.map((c) => (
-                        <button
-                          key={c.hash}
-                          type="button"
-                          className={c.hash === activeCommit ? 'history-item history-item-active' : 'history-item'}
-                          onClick={() => openCommit(c.hash)}
-                        >
-                          <div className="history-msg">{c.message}</div>
-                          <div className="history-meta">
-                            <span className="history-hash">{c.hash.slice(0, 7)}</span>
-                            <span className="history-date">{c.date}</span>
-                          </div>
-                        </button>
-                      ))
-                    )}
+                {showHistoryGraph && historyGraph ? (
+                  <div className="diff-panel" aria-label="Commit graph">
+                    <div className="diff-title">Commit Graph (all branches)</div>
+                    <pre className="diff-body history-graph-pre">{historyGraph}</pre>
                   </div>
+                ) : (
+                  <div className="history-split">
+                    <div className="history-list" aria-label="Commit list">
+                      {logItems.length === 0 ? (
+                        <div className="changes-empty">No commits loaded. Click Refresh.</div>
+                      ) : (
+                        logItems.map((c) => (
+                          <button
+                            key={c.hash}
+                            type="button"
+                            className={c.hash === activeCommit ? 'history-item history-item-active' : 'history-item'}
+                            onClick={() => openCommit(c.hash)}
+                          >
+                            <div className="history-msg">{c.message}</div>
+                            <div className="history-meta">
+                              <span className="history-hash">{c.hash.slice(0, 7)}</span>
+                              <span className="history-date">{c.date}</span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
 
-                  <div className="diff-panel" aria-label="Commit details">
-                    <div className="diff-title">{activeCommit ? `Commit: ${activeCommit.slice(0, 7)}` : 'Commit'}</div>
-                    <pre className="diff-body">{commitDetails || 'Select a commit to view details.'}</pre>
+                    <div className="diff-panel" aria-label="Commit details">
+                      <div className="diff-title">{activeCommit ? `Commit: ${activeCommit.slice(0, 7)}` : 'Commit'}</div>
+                      <pre className="diff-body">{commitDetails || 'Select a commit to view details.'}</pre>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {error ? <div className="panel-error">{error}</div> : null}
-                <div className="panel-hint">History baseline: log list + commit details. Next: search/filter and richer metadata to match Python app.</div>
+                <div className="panel-hint">History: Toggle between graph view (all branches) and list view.</div>
               </div>
             ) : activeTab === 'Remote' ? (
               <div className="remote-grid">
@@ -1053,7 +1159,6 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </div>
                 </div>
 
-                {error ? <div className="panel-error">{error}</div> : null}
                 <div className="panel-hint">Remote baseline: list remotes, add remote, fetch/pull/push.</div>
               </div>
             ) : activeTab === 'Stash' ? (
@@ -1142,7 +1247,6 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </div>
                 </div>
 
-                {error ? <div className="panel-error">{error}</div> : null}
                 <div className="panel-hint">Stash baseline: list + save + apply/pop/drop.</div>
               </div>
             ) : activeTab === 'Terminal' ? (
@@ -1219,7 +1323,6 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                   </pre>
                 </div>
 
-                {error ? <div className="panel-error">{error}</div> : null}
                 <div className="panel-hint">Terminal baseline: run one command in repo cwd and capture stdout/stderr.</div>
               </div>
             ) : activeTab === 'Debug' ? (
@@ -1279,15 +1382,39 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
                 </div>
 
                 <div className="db-split">
+                  <div className="diff-panel" aria-label="SQL Import">
+                    <div className="diff-title">SQL Import (Selective Restore)</div>
+                    <div className="db-actions">
+                      <button type="button" className="btn btn-secondary" onClick={handleDbPickSqlFile} disabled={dbBusy}>
+                        📂 Browse SQL
+                      </button>
+                      <button type="button" className="btn btn-success" onClick={handleDbImportSql} disabled={dbBusy || !dbSqlFile}>
+                        🎯 Import SQL
+                      </button>
+                      <div className="panel-hint">{dbSqlFile ? `Selected: ${dbSqlFile.split('\\').pop()}` : 'No SQL file selected'}</div>
+                    </div>
+                    {dbSqlTables.length > 0 && (
+                      <div className="panel-hint db-tables-hint">
+                        Tables found: {dbSqlTables.join(', ')}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="diff-panel" aria-label="SQL">
-                    <div className="diff-title">SQL</div>
+                    <div className="diff-title">SQL Console</div>
                     <textarea className="commit-input" value={dbSql} onChange={(e) => setDbSql(e.target.value)} rows={10} placeholder="SQL query or command" />
                     <div className="db-actions">
                       <button type="button" className="btn btn-primary" onClick={runDbQuery} disabled={dbBusy}>
-                        Query
+                        ▶ Run SQL
                       </button>
                       <button type="button" className="btn" onClick={runDbExec} disabled={dbBusy}>
                         Exec
+                      </button>
+                      <button type="button" className="btn btn-success" onClick={handleDbExport} disabled={dbBusy}>
+                        Export to TXT
+                      </button>
+                      <button type="button" className="btn" onClick={handleClearSql} disabled={dbBusy}>
+                        🧹 Clear
                       </button>
                       <div className="panel-hint">Connected: {dbConnectedPath || '—'}</div>
                     </div>
@@ -1295,12 +1422,11 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
 
                   <div className="diff-panel" aria-label="DB result">
                     <div className="diff-title">Result</div>
-                    <pre className="diff-body">{dbBusy ? 'Working…' : dbResult || 'Run Query/Exec to see output.'}</pre>
+                    <pre className="diff-body db-result-pre">{dbBusy ? 'Working…' : dbResult || 'Run Query/Exec to see output.'}</pre>
                   </div>
                 </div>
 
-                {error ? <div className="panel-error">{error}</div> : null}
-                <div className="panel-hint">Database baseline: connect to local SQLite and run SQL.</div>
+                <div className="panel-hint">SQL Console: Run queries, view results in table format, export to TXT.</div>
               </div>
             ) : (
               <div className="panel-hint">
@@ -1352,67 +1478,47 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
 
       {showSyncDialog ? (
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Sync to Main">
-          <div className="modal" style={{ maxWidth: '500px' }}>
+          <div className="modal sync-modal">
             <div className="modal-title">Sync to Main Workflow</div>
             <div className="modal-body">
-              <p style={{ marginBottom: '16px', color: '#888888' }}>
+              <p className="sync-modal-lead">
                 This will execute the following steps to sync your feature branch to main:
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="sync-steps">
                 {syncSteps.map((step, index) => (
                   <div
                     key={step}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '8px 12px',
-                      borderRadius: '4px',
-                      background: syncStep === 0 ? 'transparent' : syncStep > index ? 'rgba(0, 255, 136, 0.1)' : syncStep === index + 1 ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
-                      border: syncStep === index + 1 ? '1px solid var(--accent)' : '1px solid transparent',
-                    }}
+                    className={
+                      syncStep === 0
+                        ? 'sync-step'
+                        : syncStep > index
+                          ? 'sync-step sync-step-done'
+                          : syncStep === index + 1
+                            ? 'sync-step sync-step-active'
+                            : 'sync-step'
+                    }
                   >
                     <span
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        background: syncStep > index + 1 ? 'var(--success)' : syncStep === index + 1 ? 'var(--accent)' : 'var(--panel)',
-                        color: syncStep > index + 1 || syncStep === index + 1 ? '#000' : '#888',
-                      }}
+                      className={
+                        syncStep > index + 1
+                          ? 'sync-step-badge sync-step-badge-done'
+                          : syncStep === index + 1
+                            ? 'sync-step-badge sync-step-badge-active'
+                            : 'sync-step-badge'
+                      }
                     >
                       {syncStep > index + 1 ? '✓' : index + 1}
                     </span>
-                    <span style={{ color: syncStep === index + 1 ? 'var(--text)' : '#888' }}>{step}</span>
+                    <span className={syncStep === index + 1 ? 'sync-step-text sync-step-text-active' : 'sync-step-text'}>{step}</span>
                   </div>
                 ))}
               </div>
               {syncStep > 0 && (
-                <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '4px',
-                      background: 'var(--panel)',
-                      borderRadius: '2px',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${(syncStep / syncSteps.length) * 100}%`,
-                        height: '100%',
-                        background: 'var(--accent)',
-                        transition: 'width 0.3s ease',
-                      }}
-                    />
+                <div className="sync-progress">
+                  <div className="sync-progress-track">
+                    <div className="sync-progress-bar" style={{ width: `${(syncStep / syncSteps.length) * 100}%` }} />
                   </div>
-                  <p style={{ marginTop: '8px', color: 'var(--accent)', fontSize: '12px' }}>
+                  <p className="sync-progress-text">
                     Step {syncStep} of {syncSteps.length}: {syncSteps[syncStep - 1]}
                   </p>
                 </div>

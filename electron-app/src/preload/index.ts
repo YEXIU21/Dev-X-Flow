@@ -123,6 +123,9 @@ contextBridge.exposeInMainWorld('devxflow', {
   getLog: async (repoPath: string, maxCount: number): Promise<CommitItem[]> => {
     return await ipcRenderer.invoke('repo:log', repoPath, maxCount)
   },
+  getLogGraph: async (repoPath: string, maxCount: number): Promise<string> => {
+    return await ipcRenderer.invoke('repo:log-graph', repoPath, maxCount)
+  },
   getCommitDetails: async (repoPath: string, hash: string): Promise<string> => {
     return await ipcRenderer.invoke('repo:commit-details', repoPath, hash)
   },
@@ -147,8 +150,17 @@ contextBridge.exposeInMainWorld('devxflow', {
   stageAll: async (repoPath: string): Promise<boolean> => {
     return await ipcRenderer.invoke('repo:stage-all', repoPath)
   },
+  initRepo: async (repoPath: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('repo:init', repoPath)
+  },
+  createBranch: async (repoPath: string, branch: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('repo:create-branch', repoPath, branch)
+  },
   switchBranch: async (repoPath: string, branch: string): Promise<boolean> => {
     return await ipcRenderer.invoke('repo:switch-branch', repoPath, branch)
+  },
+  deleteBranch: async (repoPath: string, branch: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('repo:delete-branch', repoPath, branch)
   },
   merge: async (repoPath: string, branch: string): Promise<boolean> => {
     return await ipcRenderer.invoke('repo:merge', repoPath, branch)
@@ -294,8 +306,32 @@ contextBridge.exposeInMainWorld('devxflow', {
   dbTableInfo: async (key: string, tableName: string): Promise<unknown[]> => {
     return await ipcRenderer.invoke('db:table-info', key, tableName)
   },
+  dbPickExportDir: async (): Promise<string | null> => {
+    return await ipcRenderer.invoke('db:pick-export-dir')
+  },
+  dbExportToTxt: async (key: string, exportDir: string): Promise<{ exported: number; files: string[] }> => {
+    return await ipcRenderer.invoke('db:export-to-txt', key, exportDir)
+  },
+  dbPickSqlFile: async (): Promise<string | null> => {
+    return await ipcRenderer.invoke('db:pick-sql-file')
+  },
+  dbScanSqlTables: async (sqlFilePath: string): Promise<string[]> => {
+    return await ipcRenderer.invoke('db:scan-sql-tables', sqlFilePath)
+  },
+  dbImportSql: async (key: string, sqlFilePath: string): Promise<{ success: boolean; tables: string[]; message: string }> => {
+    return await ipcRenderer.invoke('db:import-sql', key, sqlFilePath)
+  },
+  dbImportSqlSelective: async (key: string, sqlFilePath: string, tableNames: string[]): Promise<{ success: boolean; tables: string[]; message: string }> => {
+    return await ipcRenderer.invoke('db:import-sql-selective', key, sqlFilePath, tableNames)
+  },
   dbPickSqlite: async (): Promise<string | null> => {
     return await ipcRenderer.invoke('db:pick-sqlite')
+  },
+  dbPickMysqlExe: async (): Promise<string | null> => {
+    return await ipcRenderer.invoke('db:pick-mysql-exe')
+  },
+  dbDetectMysqlExe: async (): Promise<string | null> => {
+    return await ipcRenderer.invoke('db:detect-mysql-exe')
   },
   dbTestConnection: async (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }): Promise<{ ok: boolean; error?: string }> => {
     return await ipcRenderer.invoke('db:test-connection', config)

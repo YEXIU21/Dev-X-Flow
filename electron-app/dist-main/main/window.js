@@ -1,10 +1,11 @@
-import { BrowserWindow } from 'electron';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-const __dirname = dirname(fileURLToPath(import.meta.url));
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createMainWindow = createMainWindow;
+const electron_1 = require("electron");
+const node_path_1 = require("node:path");
 let mainWindow = null;
-export function createMainWindow() {
-    mainWindow = new BrowserWindow({
+function createMainWindow() {
+    mainWindow = new electron_1.BrowserWindow({
         width: 1200,
         height: 760,
         show: true,
@@ -12,7 +13,7 @@ export function createMainWindow() {
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
-            preload: join(__dirname, '../preload/index.js'),
+            preload: (0, node_path_1.join)(__dirname, '../preload/index.js'),
         },
     });
     mainWindow.on('closed', () => {
@@ -24,7 +25,7 @@ export function createMainWindow() {
         mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
     else {
-        mainWindow.loadFile(join(__dirname, '../../dist-renderer/index.html'));
+        mainWindow.loadFile((0, node_path_1.join)(__dirname, '../../dist-renderer/index.html'));
     }
     return mainWindow;
 }

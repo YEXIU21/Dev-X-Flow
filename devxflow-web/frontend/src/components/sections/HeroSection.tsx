@@ -1,37 +1,68 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
+const PHRASES = [
+  'AI-powered commit generation',
+  'Real-time debugging tools',
+  'Visual Git operations',
+  'Database management',
+  'One-click deployment',
+]
+
 export function HeroSection() {
   const [typingText, setTypingText] = useState('')
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0)
-  
-  const phrases = [
-    "AI-powered commit generation",
-    "Real-time debugging tools", 
-    "Visual Git operations",
-    "Database management",
-    "One-click deployment"
-  ]
+  const [phase, setPhase] = useState<'typing' | 'pauseAfterType' | 'deleting' | 'pauseAfterDelete'>('typing')
 
   useEffect(() => {
-    const currentPhrase = phrases[currentPhraseIndex]
-    let charIndex = 0
-    
-    const typeInterval = setInterval(() => {
-      if (charIndex < currentPhrase.length) {
-        setTypingText(currentPhrase.slice(0, charIndex + 1))
-        charIndex++
-      } else {
-        clearInterval(typeInterval)
-        setTimeout(() => {
-          setCurrentPhraseIndex((prev) => (prev + 1) % phrases.length)
-          setTypingText('')
-        }, 2000)
-      }
-    }, 100)
+    const fullText = PHRASES[currentPhraseIndex]
+    const typeSpeedMs = 100
+    const deleteSpeedMs = 50
+    const pauseAfterTypeMs = 2000
+    const pauseAfterDeleteMs = 500
 
-    return () => clearInterval(typeInterval)
-  }, [currentPhraseIndex])
+    const delayMs = (() => {
+      switch (phase) {
+        case 'typing':
+          return typeSpeedMs
+        case 'deleting':
+          return deleteSpeedMs
+        case 'pauseAfterType':
+          return pauseAfterTypeMs
+        case 'pauseAfterDelete':
+          return pauseAfterDeleteMs
+      }
+    })()
+
+    const timeoutId = setTimeout(() => {
+      if (phase === 'typing') {
+        const next = fullText.slice(0, typingText.length + 1)
+        setTypingText(next)
+        if (next.length === fullText.length) setPhase('pauseAfterType')
+        return
+      }
+
+      if (phase === 'pauseAfterType') {
+        setPhase('deleting')
+        return
+      }
+
+      if (phase === 'deleting') {
+        const next = typingText.slice(0, Math.max(0, typingText.length - 1))
+        setTypingText(next)
+        if (next.length === 0) setPhase('pauseAfterDelete')
+        return
+      }
+
+      // pauseAfterDelete
+      setCurrentPhraseIndex((idx) => (idx + 1) % PHRASES.length)
+      setPhase('typing')
+    }, delayMs)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [currentPhraseIndex, phase, typingText])
 
   return (
     <section className="hero">

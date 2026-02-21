@@ -1,11 +1,14 @@
-import { ipcMain } from 'electron';
-import { simpleGit } from 'simple-git';
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.registerAiIpc = registerAiIpc;
+const electron_1 = require("electron");
+const simple_git_1 = require("simple-git");
+const promises_1 = require("node:fs/promises");
+const node_os_1 = require("node:os");
+const node_path_1 = require("node:path");
 async function loadAiConfig() {
-    const filePath = join(homedir(), '.devxflow_ai_config.json');
-    const raw = await readFile(filePath, 'utf-8');
+    const filePath = (0, node_path_1.join)((0, node_os_1.homedir)(), '.devxflow_ai_config.json');
+    const raw = await (0, promises_1.readFile)(filePath, 'utf-8');
     const parsed = JSON.parse(raw);
     const provider = (parsed.provider || 'openai');
     const apiKey = String(parsed.apiKey || '').trim();
@@ -26,7 +29,7 @@ function buildPrompt(diffText) {
     ].join('\n');
 }
 async function getRepoDiff(repoPath) {
-    const git = simpleGit({ baseDir: repoPath });
+    const git = (0, simple_git_1.simpleGit)({ baseDir: repoPath });
     // Combine staged + unstaged. Keep it bounded to avoid huge payloads.
     const unstaged = await git.diff([]);
     const staged = await git.diff(['--cached']);
@@ -219,8 +222,8 @@ async function callAzureOpenAI(config, prompt) {
         throw new Error('Azure returned empty response');
     return content.split('\n')[0].trim();
 }
-export function registerAiIpc() {
-    ipcMain.handle('ai:commit-message', async (_event, repoPath) => {
+function registerAiIpc() {
+    electron_1.ipcMain.handle('ai:commit-message', async (_event, repoPath) => {
         if (!repoPath)
             throw new Error('repoPath is required');
         const config = await loadAiConfig();
