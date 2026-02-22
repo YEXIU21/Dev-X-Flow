@@ -34,9 +34,12 @@ function main() {
     fs.mkdirSync(downloadDir, { recursive: true })
   }
 
-  const exeFiles = fs
+  const zipFiles = fs
     .readdirSync(downloadDir)
-    .filter((f) => f.toLowerCase().endsWith('.exe'))
+    .filter((f) => {
+      const lower = f.toLowerCase()
+      return lower.endsWith('.zip')
+    })
     .map((fileName) => {
       const absPath = path.join(downloadDir, fileName)
       const stat = fs.statSync(absPath)
@@ -49,7 +52,7 @@ function main() {
     })
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
 
-  const latest = exeFiles[0]
+  const latest = zipFiles[0]
   const version = getLatestVersionFromChangelog()
 
   const manifest = latest

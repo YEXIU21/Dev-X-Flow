@@ -5,6 +5,7 @@ export function DownloadPage() {
   const [exeFileName, setExeFileName] = useState<string | null>(null)
   const [sizeLabel, setSizeLabel] = useState<string | null>(null)
   const [version, setVersion] = useState<string | null>(null)
+  const [isZip, setIsZip] = useState<boolean>(false)
 
   useEffect(() => {
     let isMounted = true
@@ -22,6 +23,7 @@ export function DownloadPage() {
         setExeFileName(data.fileName ?? null)
         setSizeLabel(data.sizeLabel ?? null)
         setVersion(data.version ?? null)
+        setIsZip((data.fileName ?? '').toLowerCase().endsWith('.zip'))
       } catch {
         // ignore
       }
@@ -51,12 +53,12 @@ export function DownloadPage() {
               className="download-button"
               download
             >
-              <span>Download for Windows</span>
+              <span>Download ZIP for Windows</span>
               <span className="size">{sizeLabel ?? ''}</span>
             </a>
           ) : (
             <div className="download-button" aria-disabled="true">
-              <span>Download for Windows</span>
+              <span>Download ZIP for Windows</span>
               <span className="size">Download temporarily unavailable.</span>
             </div>
           )}
