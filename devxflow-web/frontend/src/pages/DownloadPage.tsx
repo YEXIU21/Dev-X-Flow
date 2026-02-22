@@ -5,6 +5,7 @@ export function DownloadPage() {
   const [exeFileName, setExeFileName] = useState<string | null>(null)
   const [sizeLabel, setSizeLabel] = useState<string | null>(null)
   const [unavailableReason, setUnavailableReason] = useState<string | null>(null)
+  const [version, setVersion] = useState<string>('0.1.0')
 
   useEffect(() => {
     let isMounted = true
@@ -17,11 +18,13 @@ export function DownloadPage() {
           fileName?: string | null
           sizeLabel?: string | null
           reason?: string | null
+          version?: string | null
         }
         if (!isMounted) return
         setExeFileName(data.fileName ?? null)
         setSizeLabel(data.sizeLabel ?? null)
         setUnavailableReason(data.reason ?? null)
+        setVersion(data.version ?? '0.1.0')
       } catch {
         // ignore
       }
@@ -39,7 +42,7 @@ export function DownloadPage() {
         <div className="download-card">
           <div className="icon">🚀</div>
           <h1>Download Dev-X-Flow</h1>
-          <p className="version">Version 0.1.0 (Windows Portable)</p>
+          <p className="version">Version {version} (Windows Portable)</p>
           <p className="description">
             Experience the future of Git management with Dev-X-Flow. 
             No installation required. Just download and run.
