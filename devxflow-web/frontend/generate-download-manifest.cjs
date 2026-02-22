@@ -16,10 +16,28 @@ function sha256File(absPath) {
 
 function getLatestVersionFromChangelog() {
   try {
-    const changelogPath = path.resolve(__dirname, '..', '..', '..', 'Dev-X-Flow-Pro', 'CHANGELOG.md')
-    const content = fs.readFileSync(changelogPath, 'utf8')
-    const match = content.match(/## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}/)
-    return match ? match[1] : null
+    const repoRootGuess = path.resolve(__dirname, '..', '..', '..')
+    const direct = path.join(repoRootGuess, 'Dev-X-Flow-Pro', 'CHANGELOG.md')
+    if (fs.existsSync(direct)) {
+      const content = fs.readFileSync(direct, 'utf8')
+      const match = content.match(/## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}/)
+      return match ? match[1] : null
+    }
+
+    let dir = __dirname
+    for (let i = 0; i < 10; i++) {
+      const candidate = path.join(dir, 'Dev-X-Flow-Pro', 'CHANGELOG.md')
+      if (fs.existsSync(candidate)) {
+        const content = fs.readFileSync(candidate, 'utf8')
+        const match = content.match(/## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}/)
+        return match ? match[1] : null
+      }
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+
+    return null
   } catch {
     return null
   }
