@@ -69,24 +69,28 @@ body {
 .nav-links {
   display: flex;
   gap: 30px;
+  align-items: center;
 }
 
-.nav-links a {
+.nav-links a, .dropdown-trigger {
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
   transition: all 0.3s;
   position: relative;
+  display: flex;
+  align-items: center;
+  height: 40px; /* Explicit height for alignment */
 }
 
-.nav-links a:hover {
+.nav-links a:hover, .dropdown-trigger:hover {
   color: var(--accent);
 }
 
 .nav-links a::after {
   content: '';
   position: absolute;
-  bottom: -5px;
+  bottom: 0;
   left: 0;
   width: 0;
   height: 2px;
@@ -96,6 +100,109 @@ body {
 
 .nav-links a:hover::after {
   width: 100%;
+}
+
+/* Dropdown Menu */
+.nav-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 40px; /* Match links height */
+}
+
+.dropdown-trigger {
+  cursor: pointer;
+  gap: 5px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  padding: 0;
+  line-height: 1;
+}
+
+.dropdown-content {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(0, 212, 255, 0.1);
+  border-radius: 8px;
+  min-width: 160px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: none;
+  flex-direction: column;
+  padding: 8px 0;
+  z-index: 1001;
+}
+
+.nav-dropdown:hover .dropdown-content {
+  display: flex;
+}
+
+.dropdown-content a {
+  padding: 10px 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.dropdown-content a:hover {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--accent);
+  padding-left: 25px;
+}
+
+/* Profile Circle */
+.nav-profile {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1.5px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  transition: all 0.3s;
+  overflow: hidden;
+  box-shadow: 0 0 10px var(--accent-glow);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.nav-profile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px var(--accent-glow);
+  /* Removed background change to keep inside clear */
+  border-color: var(--accent);
+}
+
+.nav-profile svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-buy {
+  background: var(--accent);
+  color: var(--bg-primary) !important;
+  padding: 8px 20px !important;
+  border-radius: 6px;
+  font-weight: 600;
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.btn-buy:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px var(--accent-glow);
+}
+
+.btn-buy::after {
+  display: none !important;
 }
 
 /* Hero Section */
