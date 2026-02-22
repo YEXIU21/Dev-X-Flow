@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 export function DownloadPage() {
   const [exeFileName, setExeFileName] = useState<string | null>(null)
   const [sizeLabel, setSizeLabel] = useState<string | null>(null)
+  const [unavailableReason, setUnavailableReason] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -12,10 +13,15 @@ export function DownloadPage() {
       try {
         const res = await fetch('/download/download-manifest.json', { cache: 'no-store' })
         if (!res.ok) return
-        const data = (await res.json()) as { fileName?: string | null; sizeLabel?: string | null }
+        const data = (await res.json()) as {
+          fileName?: string | null
+          sizeLabel?: string | null
+          reason?: string | null
+        }
         if (!isMounted) return
         setExeFileName(data.fileName ?? null)
         setSizeLabel(data.sizeLabel ?? null)
+        setUnavailableReason(data.reason ?? null)
       } catch {
         // ignore
       }
@@ -49,9 +55,9 @@ export function DownloadPage() {
               <span className="size">{sizeLabel ?? ''}</span>
             </a>
           ) : (
-            <div className="download-button" aria-disabled="true">
+            <div className="download-button" aria-disabled="true" title={unavailableReason ?? undefined}>
               <span>Download for Windows</span>
-              <span className="size">Unavailable</span>
+              <span className="size">{unavailableReason ? 'Unavailable (Deployment not configured)' : 'Unavailable'}</span>
             </div>
           )}
  
