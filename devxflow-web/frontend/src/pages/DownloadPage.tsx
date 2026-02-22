@@ -1,6 +1,31 @@
 import { Navbar } from '../components/common/Navbar'
+import { useEffect, useState } from 'react'
 
 export function DownloadPage() {
+  const [exeFileName, setExeFileName] = useState<string | null>(null)
+  const [sizeLabel, setSizeLabel] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    void (async () => {
+      try {
+        const res = await fetch('/download/download-manifest.json', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = (await res.json()) as { fileName?: string | null; sizeLabel?: string | null }
+        if (!isMounted) return
+        setExeFileName(data.fileName ?? null)
+        setSizeLabel(data.sizeLabel ?? null)
+      } catch {
+        // ignore
+      }
+    })()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <div className="download-page">
       <Navbar />
@@ -14,15 +39,22 @@ export function DownloadPage() {
             No installation required. Just download and run.
           </p>
           
-          <a 
-            href="/download/Dev-X-Flow-Setup.exe" 
-            className="download-button"
-            download
-          >
-            <span>Download for Windows</span>
-            <span className="size">81.0 MB</span>
-          </a>
-
+          {exeFileName ? (
+            <a 
+              href={`/download/${exeFileName}`}
+              className="download-button"
+              download
+            >
+              <span>Download for Windows</span>
+              <span className="size">{sizeLabel ?? ''}</span>
+            </a>
+          ) : (
+            <div className="download-button" aria-disabled="true">
+              <span>Download for Windows</span>
+              <span className="size">Unavailable</span>
+            </div>
+          )}
+ 
           <div className="requirements">
             <h3>System Requirements</h3>
             <ul>

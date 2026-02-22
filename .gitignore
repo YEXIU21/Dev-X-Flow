@@ -7,12 +7,9 @@ node_modules
 /release
 *.msi
 *.dmg
-*.deb
-*.rpm
-*.AppImage
 
 # Electron build outputs (large binaries)
-/electron-app/dist/
+/electron-app/dist*/
 /electron-app/dist-*/
 /electron-app/dist/**
 /electron-app/dist*/
