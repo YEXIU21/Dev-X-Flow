@@ -1,5 +1,9 @@
 const fs = require('fs')
 const path = require('path')
+const https = require('https')
+
+// Alternative repository for downloading EXE (when local is LFS pointer)
+const ALT_REPO_BASE = 'https://raw.githubusercontent.com/codeexsenpai-cmd/Dev-X-Flow/master/devxflow-web/frontend/public'
 
 function formatSize(bytes) {
   const mb = bytes / (1024 * 1024)
@@ -22,7 +26,65 @@ function isGitLfsPointerFile(absPath) {
   }
 }
 
-function main() {
+function downloadFile(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath)
+    https.get(url, { headers: { 'User-Agent': 'Dev-X-Flow-Builder' } }, (res) => {
+      if (res.statusCode === 302 || res.statusCode === 301) {
+        // Follow redirect
+        https.get(res.headers.location, { headers: { 'User-Agent': 'Dev-X-Flow-Builder' } }, (redirectRes) => {
+          redirectRes.pipe(file)
+          file.on('finish', () => {
+            file.close()
+            resolve()
+          })
+        }).on('error', reject)
+      } else if (res.statusCode === 200) {
+        res.pipe(file)
+        file.on('finish', () => {
+          file.close()
+          resolve()
+        })
+      } else {
+        reject(new Error(`HTTP ${res.statusCode}`))
+      }
+    }).on('error', reject)
+  })
+}
+
+async function tryDownloadFromAltRepo(fileName, downloadDir) {
+  const url = `${ALT_REPO_BASE}/download/${fileName}`
+  const destPath = path.join(downloadDir, fileName)
+  
+  console.log(`Attempting download from alt repo: ${url}`)
+  
+  try {
+    await downloadFile(url, destPath)
+    const stat = fs.statSync(destPath)
+    
+    // Verify it's not an LFS pointer
+    if (isGitLfsPointerFile(destPath)) {
+      fs.unlinkSync(destPath)
+      throw new Error('Downloaded file is LFS pointer')
+    }
+    
+    console.log(`Downloaded ${fileName} from alt repo (${formatSize(stat.size)})`)
+    return {
+      fileName,
+      sizeBytes: stat.size,
+      mtimeMs: stat.mtimeMs,
+      isLfsPointer: false,
+    }
+  } catch (err) {
+    // Clean up partial download
+    if (fs.existsSync(destPath)) {
+      fs.unlinkSync(destPath)
+    }
+    throw err
+  }
+}
+
+async function main() {
   const publicDir = path.resolve(__dirname, 'public')
   const downloadDir = path.join(publicDir, 'download')
   const manifestPath = path.join(downloadDir, 'download-manifest.json')
@@ -31,6 +93,7 @@ function main() {
     fs.mkdirSync(downloadDir, { recursive: true })
   }
 
+  // Check local EXE files
   const exeFiles = fs
     .readdirSync(downloadDir)
     .filter((f) => f.toLowerCase().endsWith('.exe'))
@@ -49,7 +112,24 @@ function main() {
     .filter((f) => !f.isLfsPointer)
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
 
-  const latest = exeFiles[0]
+  let latest = exeFiles[0]
+
+  // If no valid local EXE, try downloading from alternative repo
+  if (!latest) {
+    console.log('No valid local EXE found. Trying alternative repo...')
+    
+    // Try common EXE names
+    const candidates = ['Dev-X-Flow-Setup.exe', 'Dev-X-Flow.exe', 'Dev-X-Flow 0.1.0.exe']
+    
+    for (const fileName of candidates) {
+      try {
+        latest = await tryDownloadFromAltRepo(fileName, downloadDir)
+        break // Success, stop trying
+      } catch (err) {
+        console.log(`Failed to download ${fileName}: ${err.message}`)
+      }
+    }
+  }
 
   const manifest = latest
     ? {
@@ -77,4 +157,4 @@ function main() {
   }
 }
 
-main()
+main().catch(console.error)
