@@ -5,7 +5,6 @@ node_modules
 /dist
 /dist-electron
 /release
-*.exe
 *.msi
 *.dmg
 *.deb
@@ -18,11 +17,6 @@ node_modules
 /electron-app/dist/**
 /electron-app/dist*/
 
-# Local EXE stash folder
-/exe/
-
-# Web download folder (contains large installer)
-/devxflow-web/frontend/public/download/
 
 # Environment variables
 .env
