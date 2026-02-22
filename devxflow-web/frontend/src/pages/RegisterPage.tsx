@@ -132,7 +132,7 @@ export function RegisterPage() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .register-page {
           font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
           background: #0a0a0f;

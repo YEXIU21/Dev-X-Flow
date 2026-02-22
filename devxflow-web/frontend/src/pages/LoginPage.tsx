@@ -90,7 +90,7 @@ export function LoginPage() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .login-page {
           font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
           background: #0a0a0f;

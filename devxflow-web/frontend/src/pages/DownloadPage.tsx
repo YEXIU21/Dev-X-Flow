@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Navbar } from '../components/common/Navbar'
 
 export function DownloadPage() {
@@ -35,7 +34,7 @@ export function DownloadPage() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .download-page {
           min-height: 100vh;
           background: #0a0a0f;
