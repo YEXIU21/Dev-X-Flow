@@ -26,6 +26,7 @@ const licenseSchema = new mongoose.Schema({
     license_key: { type: String, required: true, unique: true },
     customer_email: { type: String },
     status: { type: String, default: 'active' },
+    tier: { type: String, default: 'pro', enum: ['free', 'pro', 'pro_plus', 'teams'] },
     max_activations: { type: Number, default: 3 },
     created_at: { type: Date, default: Date.now },
     expires_at: { type: Date },

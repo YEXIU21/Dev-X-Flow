@@ -17,7 +17,40 @@ interface LicenseStatus {
     max_activations: number
     current_activations: number
     device_id: string
+    tier: 'free' | 'pro' | 'pro_plus' | 'teams'
+    features: string[]
   }
+}
+
+export type LicenseTier = 'free' | 'pro' | 'pro_plus' | 'teams'
+
+interface FeatureConfig {
+  [key: string]: LicenseTier[]
+}
+
+export const FEATURE_FLAGS: FeatureConfig = {
+  // Free tier features
+  'basic_git': ['free', 'pro', 'pro_plus', 'teams'],
+  'terminal': ['free', 'pro', 'pro_plus', 'teams'],
+  'dark_mode': ['free', 'pro', 'pro_plus', 'teams'],
+  
+  // Pro tier features
+  'ai_commits': ['pro', 'pro_plus', 'teams'],
+  'database_basic': ['pro', 'pro_plus', 'teams'],
+  'diff_viewer': ['pro', 'pro_plus', 'teams'],
+  'stash_ops': ['pro', 'pro_plus', 'teams'],
+  'debug_monitor': ['pro', 'pro_plus', 'teams'],
+  
+  // Pro+ tier features
+  'merge_resolver': ['pro_plus', 'teams'],
+  'interactive_rebase': ['pro_plus', 'teams'],
+  'database_advanced': ['pro_plus', 'teams'],
+  
+  // Teams tier features
+  'team_collaboration': ['teams'],
+  'admin_dashboard': ['teams'],
+  'api_access': ['teams'],
+  'unlimited_devices': ['teams']
 }
 
 export class LicenseService {
@@ -110,5 +143,39 @@ export class LicenseService {
         console.warn('Heartbeat connection failed, retrying next cycle...')
       }
     }, 1000 * 60 * 15) // Every 15 minutes
+  }
+
+  // Feature flag checking methods
+  public async getCurrentTier(): Promise<LicenseTier> {
+    const status = await this.checkStoredLicense()
+    if (!status.valid || !status.license) {
+      return 'free' // Default to free tier if no valid license
+    }
+    return status.license.tier || 'free'
+  }
+
+  public isFeatureAvailable(featureName: string, tier: LicenseTier): boolean {
+    const allowedTiers = FEATURE_FLAGS[featureName]
+    if (!allowedTiers) {
+      console.warn(`Feature ${featureName} not found in feature flags`)
+      return false
+    }
+    return allowedTiers.includes(tier)
+  }
+
+  public async checkFeature(featureName: string): Promise<boolean> {
+    const tier = await this.getCurrentTier()
+    return this.isFeatureAvailable(featureName, tier)
+  }
+
+  public getAvailableFeatures(tier: LicenseTier): string[] {
+    return Object.entries(FEATURE_FLAGS)
+      .filter(([_, tiers]) => tiers.includes(tier))
+      .map(([feature]) => feature)
+  }
+
+  public async getAllAvailableFeatures(): Promise<string[]> {
+    const tier = await this.getCurrentTier()
+    return this.getAvailableFeatures(tier)
   }
 }

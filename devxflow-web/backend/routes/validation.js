@@ -119,6 +119,17 @@ router.post('/', verifyApiKey, async (req, res) => {
 
         await logValidation(license_key, deviceIdToUse, req.ip, 'valid', 'License validated successfully');
 
+        // Determine tier based on license type
+        const tier = license.tier || 'pro'; // Default to pro if not specified
+        
+        // Define features available for each tier
+        const tierFeatures = {
+            'free': ['basic_git', 'terminal', 'dark_mode'],
+            'pro': ['basic_git', 'terminal', 'dark_mode', 'ai_commits', 'database_basic', 'diff_viewer', 'stash_ops', 'debug_monitor'],
+            'pro_plus': ['basic_git', 'terminal', 'dark_mode', 'ai_commits', 'database_basic', 'diff_viewer', 'stash_ops', 'debug_monitor', 'merge_resolver', 'interactive_rebase', 'database_advanced'],
+            'teams': ['basic_git', 'terminal', 'dark_mode', 'ai_commits', 'database_basic', 'diff_viewer', 'stash_ops', 'debug_monitor', 'merge_resolver', 'interactive_rebase', 'database_advanced', 'team_collaboration', 'admin_dashboard', 'api_access', 'unlimited_devices']
+        };
+
         res.json({
             valid: true,
             license: {
@@ -128,7 +139,9 @@ router.post('/', verifyApiKey, async (req, res) => {
                 expires_at: license.expires_at,
                 max_activations: license.max_activations,
                 current_activations: existingActivation ? activationCount : activationCount + 1,
-                device_id: deviceIdToUse
+                device_id: deviceIdToUse,
+                tier: tier,
+                features: tierFeatures[tier] || tierFeatures['pro']
             }
         });
 

@@ -4,59 +4,94 @@ export function PricingSection() {
   return (
     <section className="pricing" id="pricing">
       <div className="section-title">
-        <h2>Flexible Pricing</h2>
-        <p>Choose the plan that fits your needs</p>
+        <h2>Choose Your Plan</h2>
+        <p>From solo developers to enterprise teams</p>
       </div>
       
-      <div className="pricing-grid">
+      <div className="pricing-grid four-cards">
+        {/* Free Tier */}
         <div className="pricing-card">
-          <h3>1 Year</h3>
-          <div className="price">₱399</div>
-          <p style={{color: 'var(--text-secondary)'}}>Annual license</p>
+          <div className="pricing-badge">Free Trial</div>
+          <h3>Starter</h3>
+          <div className="price">Free</div>
+          <p style={{color: 'var(--text-secondary)'}}>30-day trial</p>
           <ul className="pricing-features">
-            <li>All features included</li>
-            <li>Up to 3 devices</li>
-            <li>1 year of updates</li>
-            <li>Email support</li>
-            <li>Pay via GCash</li>
+            <li>✓ Basic Git operations</li>
+            <li>✓ Terminal access</li>
+            <li>✓ Dark mode</li>
+            <li>✓ View commit history</li>
+            <li>✓ Up to 2 devices</li>
+            <li className="feature-disabled">✗ AI commit messages</li>
+            <li className="feature-disabled">✗ Database tools</li>
+            <li className="feature-disabled">✗ Merge resolver</li>
           </ul>
-          <Link to="/payment?plan=1year" className="btn btn-secondary" style={{display: 'inline-block'}}>Buy Now</Link>
+          <Link to="/register" className="btn btn-secondary" style={{display: 'inline-block'}}>Start Free Trial</Link>
         </div>
         
+        {/* Pro Tier */}
         <div className="pricing-card featured">
-          <h3>3 Years</h3>
-          <div className="price">₱899</div>
-          <p style={{color: 'var(--text-secondary)'}}>Best value - save ₱298</p>
+          <div className="pricing-badge popular">Most Popular</div>
+          <h3>Pro</h3>
+          <div className="price">₱399<span className="price-period">/year</span></div>
+          <p style={{color: 'var(--text-secondary)'}}>For solo developers</p>
           <ul className="pricing-features">
-            <li>All features included</li>
-            <li>Up to 5 devices</li>
-            <li>3 years of updates</li>
-            <li>Priority support</li>
-            <li>Pay via GCash</li>
+            <li>✓ Everything in Starter</li>
+            <li>✓ AI-powered commits</li>
+            <li>✓ Database management</li>
+            <li>✓ Diff viewer</li>
+            <li>✓ Stash operations</li>
+            <li>✓ Debug monitor</li>
+            <li>✓ Up to 3 devices</li>
+            <li className="feature-disabled">✗ Merge resolver</li>
+            <li className="feature-disabled">✗ Interactive rebase</li>
           </ul>
-          <Link to="/payment?plan=3year" className="btn btn-primary" style={{display: 'inline-block'}}>Buy Now</Link>
+          <Link to="/payment?plan=pro" className="btn btn-primary" style={{display: 'inline-block'}}>Buy Pro</Link>
         </div>
         
+        {/* Pro+ Tier */}
         <div className="pricing-card">
-          <h3>Enterprise</h3>
-          <div className="price" style={{fontSize: '2rem'}}>Let's Talk</div>
-          <p style={{color: 'var(--text-secondary)'}}>Custom solutions</p>
+          <div className="pricing-badge">Best Value</div>
+          <h3>Pro+</h3>
+          <div className="price">₱599<span className="price-period">/year</span></div>
+          <p style={{color: 'var(--text-secondary)'}}>For power users</p>
           <ul className="pricing-features">
-            <li>All features included</li>
-            <li>Unlimited devices</li>
-            <li>Custom integrations</li>
-            <li>Dedicated support</li>
-            <li>SLA guarantee</li>
+            <li>✓ Everything in Pro</li>
+            <li>✓ Visual merge resolver</li>
+            <li>✓ Interactive rebase UI</li>
+            <li>✓ Advanced DB tools</li>
+            <li>✓ SQL import/export</li>
+            <li>✓ Selective restore</li>
+            <li>✓ Up to 8 devices</li>
+            <li>✓ Priority support</li>
           </ul>
-          <Link to="/contact" className="btn btn-secondary" style={{display: 'inline-block'}}>Contact Us</Link>
+          <Link to="/payment?plan=pro_plus" className="btn btn-secondary" style={{display: 'inline-block'}}>Buy Pro+</Link>
+        </div>
+
+        {/* Teams Tier */}
+        <div className="pricing-card">
+          <div className="pricing-badge">Enterprise</div>
+          <h3>Teams</h3>
+          <div className="price">₱1,999<span className="price-period">/year</span></div>
+          <p style={{color: 'var(--text-secondary)'}}>Up to 10 members</p>
+          <ul className="pricing-features">
+            <li>✓ Everything in Pro+</li>
+            <li>✓ Unlimited devices per member</li>
+            <li>✓ Team license dashboard</li>
+            <li>✓ Shared snippets & templates</li>
+            <li>✓ Admin controls</li>
+            <li>✓ API access</li>
+            <li>✓ Audit logs</li>
+            <li>✓ Dedicated support (4h)</li>
+            <li>✓ Custom onboarding</li>
+          </ul>
+          <Link to="/contact?plan=teams" className="btn btn-secondary" style={{display: 'inline-block'}}>Contact Sales</Link>
         </div>
       </div>
       
-      <div style={{textAlign: 'center', marginTop: '30px'}}>
-        <p style={{color: 'var(--text-secondary)'}}>
-          <span style={{color: 'var(--accent)'}}>🎁</span> 
-          Try free for 30 days - no credit card required
-          <Link to="/register" style={{color: 'var(--accent)', marginLeft: '10px'}}>Start Trial →</Link>
+      <div style={{textAlign: 'center', marginTop: '40px'}}>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>
+          All paid plans include 1 year of updates and email support. 
+          <Link to="/compare" style={{color: 'var(--accent)', marginLeft: '8px'}}>Compare all features →</Link>
         </p>
       </div>
     </section>
