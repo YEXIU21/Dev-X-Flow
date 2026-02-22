@@ -15,12 +15,12 @@ export function DownloadPage() {
           </p>
           
           <a 
-            href="/download/Dev-X-Flow.exe" 
+            href="/download/Dev-X-Flow-Setup.exe" 
             className="download-button"
             download
           >
             <span>Download for Windows</span>
-            <span className="size">77.2 MB</span>
+            <span className="size">81.0 MB</span>
           </a>
 
           <div className="requirements">
