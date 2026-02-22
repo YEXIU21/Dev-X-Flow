@@ -1,6 +1,37 @@
 import { Navbar } from '../components/common/Navbar'
+import { useEffect, useState } from 'react'
 
 export function DownloadPage() {
+  const [exeFileName, setExeFileName] = useState<string | null>(null)
+  const [sizeLabel, setSizeLabel] = useState<string | null>(null)
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    void (async () => {
+      try {
+        const res = await fetch('/download/download-manifest.json', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = (await res.json()) as {
+          fileName?: string | null
+          sizeLabel?: string | null
+          version?: string | null
+        }
+        if (!isMounted) return
+        setExeFileName(data.fileName ?? null)
+        setSizeLabel(data.sizeLabel ?? null)
+        setVersion(data.version ?? null)
+      } catch {
+        // ignore
+      }
+    })()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <div className="download-page">
       <Navbar />
@@ -8,20 +39,27 @@ export function DownloadPage() {
         <div className="download-card">
           <div className="icon">🚀</div>
           <h1>Download Dev-X-Flow</h1>
-          <p className="version">Version 0.1.0 (Windows Portable)</p>
+          <p className="version">Version {version ?? '—'} (Windows Portable)</p>
           <p className="description">
             Experience the future of Git management with Dev-X-Flow. 
             No installation required. Just download and run.
           </p>
           
-          <a 
-            href="/download/Dev-X-Flow.exe" 
-            className="download-button"
-            download
-          >
-            <span>Download for Windows</span>
-            <span className="size">77.2 MB</span>
-          </a>
+          {exeFileName ? (
+            <a
+              href={`/download/${exeFileName}`}
+              className="download-button"
+              download
+            >
+              <span>Download for Windows</span>
+              <span className="size">{sizeLabel ?? ''}</span>
+            </a>
+          ) : (
+            <div className="download-button" aria-disabled="true">
+              <span>Download for Windows</span>
+              <span className="size">Download temporarily unavailable.</span>
+            </div>
+          )}
 
           <div className="requirements">
             <h3>System Requirements</h3>

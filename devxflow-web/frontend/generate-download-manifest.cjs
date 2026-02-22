@@ -1,9 +1,28 @@
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 
 function formatSize(bytes) {
   const mb = bytes / (1024 * 1024)
   return `${mb.toFixed(1)} MB`
+}
+
+function sha256File(absPath) {
+  const h = crypto.createHash('sha256')
+  const buf = fs.readFileSync(absPath)
+  h.update(buf)
+  return h.digest('hex')
+}
+
+function getLatestVersionFromChangelog() {
+  try {
+    const changelogPath = path.resolve(__dirname, '..', '..', '..', 'Dev-X-Flow-Pro', 'CHANGELOG.md')
+    const content = fs.readFileSync(changelogPath, 'utf8')
+    const match = content.match(/## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
 }
 
 function main() {
@@ -23,6 +42,7 @@ function main() {
       const stat = fs.statSync(absPath)
       return {
         fileName,
+        absPath,
         sizeBytes: stat.size,
         mtimeMs: stat.mtimeMs,
       }
@@ -30,20 +50,25 @@ function main() {
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
 
   const latest = exeFiles[0]
+  const version = getLatestVersionFromChangelog()
 
   const manifest = latest
     ? {
-        fileName: latest.fileName,
-        sizeBytes: latest.sizeBytes,
-        sizeLabel: formatSize(latest.sizeBytes),
-        updatedAt: new Date(latest.mtimeMs).toISOString(),
-      }
+      fileName: latest.fileName,
+      sizeBytes: latest.sizeBytes,
+      sizeLabel: formatSize(latest.sizeBytes),
+      updatedAt: new Date(latest.mtimeMs).toISOString(),
+      version,
+      sha256: sha256File(latest.absPath),
+    }
     : {
-        fileName: null,
-        sizeBytes: 0,
-        sizeLabel: null,
-        updatedAt: new Date().toISOString(),
-      }
+      fileName: null,
+      sizeBytes: 0,
+      sizeLabel: null,
+      updatedAt: new Date().toISOString(),
+      version,
+      sha256: null,
+    }
 
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
 }

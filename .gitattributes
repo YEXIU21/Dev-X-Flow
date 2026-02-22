@@ -1,2 +1,2 @@
 *.exe filter=lfs diff=lfs merge=lfs -text
-devxflow-web/frontend/public/download/*.exe filter=lfs diff=lfs merge=lfs -text
+devxflow-web/frontend/public/download/*.exe -filter -diff -merge text
