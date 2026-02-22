@@ -1,7 +1,7 @@
 {
-  "name": "dev-x-flow-pro-licensing",
+  "name": "dev-x-flow-licensing",
   "version": "1.0.0",
-  "description": "License management system for Dev-X-Flow-Pro",
+  "description": "License management system for Dev-X-Flow",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

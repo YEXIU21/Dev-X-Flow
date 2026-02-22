@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Navbar } from '../components/common/Navbar'
 
 export function ChangelogPage() {
@@ -46,7 +45,7 @@ export function ChangelogPage() {
       badge: '',
       badgeText: '',
       changes: [
-        { type: 'NEW', text: 'Initial Dev-X-Flow-Pro Release' },
+        { type: 'NEW', text: 'Initial Dev-X-Flow Release' },
         { type: 'NEW', text: 'Modern dark UI with tabbed interface' },
         { type: 'NEW', text: 'Repository management (commit, push, pull, stash)' },
         { type: 'NEW', text: 'AI-powered commit message generation (7 providers)' },
@@ -93,7 +92,7 @@ export function ChangelogPage() {
       <div className="container">
         <div className="header">
           <h1>Changelog</h1>
-          <p>Track the evolution of Dev-X-Flow-Pro</p>
+          <p>Track the evolution of Dev-X-Flow</p>
         </div>
         
         {changelog.map((release, index) => (
@@ -121,166 +120,6 @@ export function ChangelogPage() {
         <h2>Why DevXFlow?</h2>
         <p>&copy; 2026 DevXFlow. All rights reserved.</p>
       </footer>
-
-      <style jsx>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        
-        .changelog-page {
-          font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-          background: var(--bg-primary);
-          color: var(--text-primary);
-          min-height: 100vh;
-        }
-        
-        /* Main Content */
-        .container {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 120px 20px 60px;
-        }
-        
-        .header {
-          text-align: center;
-          margin-bottom: 60px;
-        }
-        
-        .header h1 {
-          font-size: 36px;
-          margin-bottom: 15px;
-          color: var(--accent);
-        }
-        
-        .header p {
-          color: var(--text-secondary);
-          font-size: 16px;
-        }
-        
-        /* Version Cards */
-        .version-card {
-          background: var(--bg-secondary);
-          border-radius: 16px;
-          padding: 30px;
-          margin-bottom: 30px;
-          border: 1px solid rgba(0, 212, 255, 0.1);
-          transition: all 0.3s;
-        }
-        
-        .version-card:hover {
-          border-color: var(--accent);
-          box-shadow: 0 10px 30px rgba(0, 212, 255, 0.1);
-        }
-        
-        .version-header {
-          display: flex;
-          align-items: center;
-          gap: 15px;
-          margin-bottom: 20px;
-          padding-bottom: 15px;
-          border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .version-number {
-          background: var(--accent);
-          color: var(--bg-primary);
-          padding: 8px 16px;
-          border-radius: 8px;
-          font-weight: 700;
-          font-size: 18px;
-        }
-        
-        .version-date {
-          color: var(--text-secondary);
-          font-size: 14px;
-        }
-        
-        .version-badge {
-          margin-left: auto;
-          padding: 5px 12px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-        
-        .badge-latest {
-          background: var(--success);
-          color: var(--bg-primary);
-        }
-        
-        .badge-beta {
-          background: var(--warning);
-          color: var(--bg-primary);
-        }
-        
-        .changes-list {
-          list-style: none;
-        }
-        
-        .changes-list li {
-          padding: 10px 0;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-        }
-        
-        .changes-list li:last-child {
-          border-bottom: none;
-        }
-        
-        .change-type {
-          padding: 3px 8px;
-          border-radius: 4px;
-          font-size: 11px;
-          font-weight: 600;
-          min-width: 60px;
-          text-align: center;
-        }
-        
-        .type-feature {
-          background: rgba(0, 212, 255, 0.2);
-          color: var(--accent);
-        }
-        
-        .type-fix {
-          background: rgba(0, 255, 136, 0.2);
-          color: var(--success);
-        }
-        
-        .type-improvement {
-          background: rgba(255, 170, 0, 0.2);
-          color: var(--warning);
-        }
-        
-        .change-text {
-          color: var(--text-secondary);
-          font-size: 14px;
-          line-height: 1.6;
-        }
-        
-        /* Footer */
-        .footer {
-          text-align: center;
-          padding: 40px;
-          border-top: 1px solid rgba(0, 212, 255, 0.1);
-          margin-top: 40px;
-        }
-        
-        .footer p {
-          color: var(--text-secondary);
-          font-size: 14px;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-          .container { padding-top: 100px; }
-          .version-header { flex-wrap: wrap; }
-          .version-badge { margin-left: 0; margin-top: 10px; }
-        }
-      `}</style>
     </div>
   )
 }

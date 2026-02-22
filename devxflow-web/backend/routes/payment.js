@@ -32,7 +32,7 @@ router.post('/create-intent', async (req, res) => {
                         amount: amount,
                         currency: 'PHP',
                         payment_method_allowed: ['gcash'],
-                        description: 'Dev-X-Flow-Pro License',
+                        description: 'Dev-X-Flow License',
                         metadata: {
                             customer_email: email
                         }

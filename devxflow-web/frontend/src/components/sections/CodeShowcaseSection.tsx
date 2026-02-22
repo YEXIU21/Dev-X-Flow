@@ -311,9 +311,9 @@ export function CodeShowcaseSection() {
         <p>Clean, intuitive interface designed for real developers</p>
       </div>
 
-      <div className="app-preview" aria-label="Dev-X-Flow-Pro desktop app UI preview">
+      <div className="app-preview" aria-label="Dev-X-Flow desktop app UI preview">
         <div className="app-preview-titlebar">
-          <div className="app-preview-title">Dev-X-Flow-Pro v1.2</div>
+          <div className="app-preview-title">Dev-X-Flow v1.2</div>
           <div className="app-preview-window-actions" aria-hidden="true">
             <span className="app-preview-dot" />
             <span className="app-preview-dot" />

@@ -59,7 +59,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`Dev-X-Flow-Pro Licensing Server`);
+    console.log(`Dev-X-Flow Licensing Server`);
     console.log(`================================`);
     console.log(`Server running on port ${PORT}`);
     console.log(`API endpoints:`);
