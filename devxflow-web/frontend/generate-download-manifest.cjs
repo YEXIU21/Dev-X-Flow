@@ -3,7 +3,7 @@ const path = require('path')
 const https = require('https')
 
 // Alternative repository for downloading EXE (when local is LFS pointer)
-const ALT_REPO_BASE = 'https://raw.githubusercontent.com/codeexsenpai-cmd/Dev-X-Flow/master/devxflow-web/frontend/public'
+const ALT_REPO_BASE = 'https://github.com/codeexsenpai-cmd/dev-x-flow/blob/main/public'
 
 function formatSize(bytes) {
   const mb = bytes / (1024 * 1024)
