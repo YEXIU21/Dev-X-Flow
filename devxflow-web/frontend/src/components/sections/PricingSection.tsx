@@ -15,6 +15,9 @@ export function PricingSection() {
           <h3>Starter</h3>
           <div className="price">Free</div>
           <p style={{color: 'var(--text-secondary)'}}>30-day trial</p>
+          <div className="pricing-button-wrapper">
+            <Link to="/register" className="btn btn-secondary pricing-btn">Start Free Trial</Link>
+          </div>
           <ul className="pricing-features">
             <li>✓ Basic Git operations</li>
             <li>✓ Terminal access</li>
@@ -25,7 +28,6 @@ export function PricingSection() {
             <li className="feature-disabled">✗ Database tools</li>
             <li className="feature-disabled">✗ Merge resolver</li>
           </ul>
-          <Link to="/register" className="btn btn-secondary" style={{display: 'inline-block'}}>Start Free Trial</Link>
         </div>
         
         {/* Pro Tier */}
@@ -34,6 +36,9 @@ export function PricingSection() {
           <h3>Pro</h3>
           <div className="price">₱399<span className="price-period">/year</span></div>
           <p style={{color: 'var(--text-secondary)'}}>For solo developers</p>
+          <div className="pricing-button-wrapper">
+            <Link to="/payment?plan=pro" className="btn btn-primary pricing-btn">Buy Pro</Link>
+          </div>
           <ul className="pricing-features">
             <li>✓ Everything in Starter</li>
             <li>✓ AI-powered commits</li>
@@ -45,7 +50,6 @@ export function PricingSection() {
             <li className="feature-disabled">✗ Merge resolver</li>
             <li className="feature-disabled">✗ Interactive rebase</li>
           </ul>
-          <Link to="/payment?plan=pro" className="btn btn-primary" style={{display: 'inline-block'}}>Buy Pro</Link>
         </div>
         
         {/* Pro+ Tier */}
@@ -54,6 +58,9 @@ export function PricingSection() {
           <h3>Pro+</h3>
           <div className="price">₱599<span className="price-period">/year</span></div>
           <p style={{color: 'var(--text-secondary)'}}>For power users</p>
+          <div className="pricing-button-wrapper">
+            <Link to="/payment?plan=pro_plus" className="btn btn-secondary pricing-btn">Buy Pro+</Link>
+          </div>
           <ul className="pricing-features">
             <li>✓ Everything in Pro</li>
             <li>✓ Visual merge resolver</li>
@@ -64,7 +71,6 @@ export function PricingSection() {
             <li>✓ Up to 8 devices</li>
             <li>✓ Priority support</li>
           </ul>
-          <Link to="/payment?plan=pro_plus" className="btn btn-secondary" style={{display: 'inline-block'}}>Buy Pro+</Link>
         </div>
 
         {/* Teams Tier */}
@@ -73,6 +79,9 @@ export function PricingSection() {
           <h3>Teams</h3>
           <div className="price">₱1,999<span className="price-period">/year</span></div>
           <p style={{color: 'var(--text-secondary)'}}>Up to 10 members</p>
+          <div className="pricing-button-wrapper">
+            <Link to="/contact?plan=teams" className="btn btn-secondary pricing-btn">Contact Sales</Link>
+          </div>
           <ul className="pricing-features">
             <li>✓ Everything in Pro+</li>
             <li>✓ Unlimited devices per member</li>
@@ -84,7 +93,6 @@ export function PricingSection() {
             <li>✓ Dedicated support (4h)</li>
             <li>✓ Custom onboarding</li>
           </ul>
-          <Link to="/contact?plan=teams" className="btn btn-secondary" style={{display: 'inline-block'}}>Contact Sales</Link>
         </div>
       </div>
       
