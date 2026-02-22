@@ -46,6 +46,12 @@ function main() {
       }
 
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+  console.log('Download manifest generated:', manifestPath)
+  if (latest) {
+    console.log('Available file:', latest.fileName, `(${formatSize(latest.sizeBytes)})`)
+  } else {
+    console.log('Warning: No EXE file available for download')
+  }
 }
 
 main()
