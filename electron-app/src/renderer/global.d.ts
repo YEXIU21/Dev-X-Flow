@@ -157,6 +157,15 @@ declare global {
       dbPickMysqlExe: () => Promise<string | null>
       dbDetectMysqlExe: () => Promise<string | null>
       dbTestConnection: (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }) => Promise<{ ok: boolean; error?: string }>
+      // License IPC APIs
+      licenseCheck: () => Promise<{ valid: boolean; tier?: string; expires_at?: string | null; features?: string[]; error?: string }>
+      licenseActivate: (licenseKey: string) => Promise<{ valid: boolean; tier?: string; expires_at?: string | null; features?: string[]; error?: string }>
+      licenseDeactivate: () => Promise<{ success: boolean }>
+      licenseGetTier: () => Promise<{ tier: string }>
+      licenseCheckFeature: (feature: string) => Promise<{ available: boolean }>
+      licenseBuy: () => Promise<void>
+      onLicenseStatus: (callback: (status: { valid: boolean; tier: string; expires_at?: string | null }) => void) => (() => void)
+      onLicenseExpired: (callback: () => void) => (() => void)
     }
   }
 }

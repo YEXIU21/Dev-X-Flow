@@ -4,7 +4,9 @@ import { DebugMonitor } from './components/DebugMonitor'
 import { MergeResolver } from './components/MergeResolver'
 import { RebaseUI } from './components/RebaseUI'
 import { DiffViewer } from './components/DiffViewer'
-import { TitleBar } from './app-shell/TitleBar'
+import { LicenseModal } from './components/LicenseModal'
+import { UpgradePrompt } from './components/UpgradePrompt'
+import { TrialBadge } from './components/TrialBadge'
 import { Button } from './design-system/components/Button'
 import { Input } from './design-system/components/Input'
 import { Modal } from './design-system/components/Modal'
@@ -140,6 +142,14 @@ export function App() {
   const [srSelectedTables, setSrSelectedTables] = useState<string[]>([])
   const [srBusy, setSrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // License state
+  const [licenseTier, setLicenseTier] = useState<'free' | 'pro' | 'pro_plus' | 'teams'>('free')
+  const [licenseValid, setLicenseValid] = useState(false)
+  const [licenseExpiresAt, setLicenseExpiresAt] = useState<string | null>(null)
+  const [showLicenseModal, setShowLicenseModal] = useState(false)
+  const [licenseModalMode, setLicenseModalMode] = useState<'welcome' | 'input' | 'trial'>('welcome')
+  const [upgradeFeature, setUpgradeFeature] = useState('')
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
   // Dialog visibility states
   const [showBranchDialog, setShowBranchDialog] = useState(false)
   const [showSwitchBranchDialog, setShowSwitchBranchDialog] = useState(false)
@@ -218,6 +228,101 @@ export function App() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [repoPath])
+
+  // License initialization
+  useEffect(() => {
+    const initLicense = async () => {
+      try {
+        const status = await window.devxflow.licenseCheck()
+        if (status.valid && status.tier) {
+          setLicenseValid(true)
+          setLicenseTier(status.tier as 'free' | 'pro' | 'pro_plus' | 'teams')
+          setLicenseExpiresAt(status.expires_at || null)
+        } else {
+          // Show welcome modal on first launch
+          setLicenseModalMode('welcome')
+          setShowLicenseModal(true)
+        }
+      } catch (e) {
+        console.error('License check failed:', e)
+        setLicenseModalMode('welcome')
+        setShowLicenseModal(true)
+      }
+    }
+
+    void initLicense()
+
+    // Listen for license status updates
+    const unsubscribe = window.devxflow.onLicenseStatus((status) => {
+      setLicenseValid(status.valid)
+      setLicenseTier(status.tier as 'free' | 'pro' | 'pro_plus' | 'teams')
+      setLicenseExpiresAt(status.expires_at || null)
+    })
+
+    // Listen for menu events
+    const handleMenuShowLicense = () => {
+      setLicenseModalMode('welcome')
+      setShowLicenseModal(true)
+    }
+
+    const handleMenuShowActivate = () => {
+      setLicenseModalMode('input')
+      setShowLicenseModal(true)
+    }
+
+    const handleMenuDeactivate = async () => {
+      await window.devxflow.licenseDeactivate()
+      setLicenseValid(false)
+      setLicenseTier('free')
+      setLicenseExpiresAt(null)
+    }
+
+    window.addEventListener('license:show-modal', handleMenuShowLicense)
+    window.addEventListener('license:show-activate', handleMenuShowActivate)
+    window.addEventListener('license:deactivate', handleMenuDeactivate)
+
+    return () => {
+      unsubscribe()
+      window.removeEventListener('license:show-modal', handleMenuShowLicense)
+      window.removeEventListener('license:show-activate', handleMenuShowActivate)
+      window.removeEventListener('license:deactivate', handleMenuDeactivate)
+    }
+  }, [])
+
+  // License activation handler
+  const handleLicenseActivate = async (licenseKey: string) => {
+    const result = await window.devxflow.licenseActivate(licenseKey)
+    if (result.valid) {
+      setLicenseValid(true)
+      setLicenseTier(result.tier as 'free' | 'pro' | 'pro_plus' | 'teams')
+      setLicenseExpiresAt(result.expires_at || null)
+      setShowLicenseModal(false)
+    }
+    return result
+  }
+
+  // Check feature availability
+  const checkFeature = async (feature: string): Promise<boolean> => {
+    const result = await window.devxflow.licenseCheckFeature(feature)
+    return result.available
+  }
+
+  // Handle feature click with gating
+  const handleFeatureClick = async (feature: string, requiredTier: 'free' | 'pro' | 'pro_plus' | 'teams') => {
+    const available = await checkFeature(feature)
+    if (!available) {
+      setUpgradeFeature(feature)
+      setShowUpgradePrompt(true)
+      return false
+    }
+    return true
+  }
+
+  // Handle upgrade
+  const handleUpgrade = () => {
+    setShowUpgradePrompt(false)
+    void window.devxflow.licenseBuy()
+  }
 
   const renderTextWithLinks = (text: string) => {
     const urlRe = /(https?:\/\/[^\s]+)/g
@@ -1424,10 +1529,8 @@ const runStashAction = async (action: () => Promise<string>) => {
     <div className="app">
       <header className="app-header">
         <div className="app-logo">Dev-X-Flow</div>
+        <TrialBadge expiresAt={licenseExpiresAt} tier={licenseTier} />
       </header>
-      <div className="app-titlebar">
-        <TitleBar title={title} />
-      </div>
 
       <div className="main-container">
         {/* Repository Path Section - Web Style */}
@@ -1459,19 +1562,50 @@ const runStashAction = async (action: () => Promise<string>) => {
 
         {/* Tab Navigation - Top tabs like Python TNotebook */}
         <div className="tab-bar">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={t === activeTab ? 'top-tab top-tab-active' : 'top-tab'}
-              onClick={() => {
-                setActiveTab(t)
-                if (t === 'Terminal') void initTerminal()
-              }}
-            >
-              {t}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            // Determine if tab needs upgrade badge
+            const needsPro = ['Debug', 'Diff Viewer', 'Stash'].includes(t)
+            const needsProPlus = ['Merge Resolver', 'Rebase'].includes(t)
+            const needsTeams = ['Database'].includes(t)
+            const showBadge = (needsPro && licenseTier === 'free') ||
+                              (needsProPlus && ['free', 'pro'].includes(licenseTier)) ||
+                              (needsTeams && ['free', 'pro', 'pro_plus'].includes(licenseTier))
+
+            return (
+              <button
+                key={t}
+                type="button"
+                className={t === activeTab ? 'top-tab top-tab-active' : 'top-tab'}
+                onClick={async () => {
+                  // Check if tab requires higher tier
+                  const needsPro = ['Debug', 'Diff Viewer', 'Stash'].includes(t)
+                  const needsProPlus = ['Merge Resolver', 'Rebase'].includes(t)
+                  const needsTeams = ['Database'].includes(t)
+                  const isLocked = (needsPro && licenseTier === 'free') ||
+                                   (needsProPlus && ['free', 'pro'].includes(licenseTier)) ||
+                                   (needsTeams && ['free', 'pro', 'pro_plus'].includes(licenseTier))
+
+                  if (isLocked) {
+                    // Show upgrade prompt instead of switching tab
+                    let requiredTier: 'pro' | 'pro_plus' | 'teams' = 'pro'
+                    if (needsProPlus) requiredTier = 'pro_plus'
+                    if (needsTeams) requiredTier = 'teams'
+
+                    setUpgradeFeature(t)
+                    setShowUpgradePrompt(true)
+                    return
+                  }
+
+                  // Allow tab switch for unlocked tabs
+                  setActiveTab(t)
+                  if (t === 'Terminal') void initTerminal()
+                }}
+              >
+                {t}
+                {showBadge && <span className="tab-upgrade-badge">UPGRADE</span>}
+              </button>
+            )
+          })}
         </div>
 
         {/* Tab Content */}
@@ -2467,6 +2601,24 @@ ${changes.filter(c => c.index === '?').map(c => `\t${c.path}`).join('\n') || '\t
           disabled={branchBusy}
         />
       </Modal>
+
+      {/* License Modal */}
+      <LicenseModal
+        isOpen={showLicenseModal}
+        onClose={() => setShowLicenseModal(false)}
+        onActivate={handleLicenseActivate}
+        initialMode={licenseModalMode}
+      />
+
+      {/* Upgrade Prompt */}
+      <UpgradePrompt
+        feature={upgradeFeature}
+        currentTier={licenseTier}
+        requiredTier={upgradeFeature === 'ai_commits' || upgradeFeature === 'database_basic' || upgradeFeature === 'diff_viewer' || upgradeFeature === 'stash_ops' || upgradeFeature === 'debug_monitor' ? 'pro' : upgradeFeature === 'merge_resolver' || upgradeFeature === 'interactive_rebase' || upgradeFeature === 'database_advanced' ? 'pro_plus' : 'teams'}
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        onUpgrade={handleUpgrade}
+      />
     </div>
   )
 }

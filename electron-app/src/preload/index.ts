@@ -336,4 +336,33 @@ contextBridge.exposeInMainWorld('devxflow', {
   dbTestConnection: async (config: { engine: 'sqlite' | 'mysql' | 'postgresql' | 'sqlserver'; config: Record<string, unknown> }): Promise<{ ok: boolean; error?: string }> => {
     return await ipcRenderer.invoke('db:test-connection', config)
   },
+  // License IPC APIs
+  licenseCheck: async (): Promise<{ valid: boolean; tier?: string; expires_at?: string | null; features?: string[]; error?: string }> => {
+    return await ipcRenderer.invoke('license:check')
+  },
+  licenseActivate: async (licenseKey: string): Promise<{ valid: boolean; tier?: string; expires_at?: string | null; features?: string[]; error?: string }> => {
+    return await ipcRenderer.invoke('license:activate', licenseKey)
+  },
+  licenseDeactivate: async (): Promise<{ success: boolean }> => {
+    return await ipcRenderer.invoke('license:deactivate')
+  },
+  licenseGetTier: async (): Promise<{ tier: string }> => {
+    return await ipcRenderer.invoke('license:get-tier')
+  },
+  licenseCheckFeature: async (feature: string): Promise<{ available: boolean }> => {
+    return await ipcRenderer.invoke('license:check-feature', feature)
+  },
+  licenseBuy: async (): Promise<void> => {
+    return await ipcRenderer.invoke('license:buy')
+  },
+  onLicenseStatus: (callback: (status: { valid: boolean; tier: string; expires_at?: string | null }) => void) => {
+    const handler = (_event: unknown, status: { valid: boolean; tier: string; expires_at?: string | null }) => callback(status)
+    ipcRenderer.on('license:status', handler)
+    return () => ipcRenderer.removeListener('license:status', handler)
+  },
+  onLicenseExpired: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('license:expired', handler)
+    return () => ipcRenderer.removeListener('license:expired', handler)
+  },
 })
