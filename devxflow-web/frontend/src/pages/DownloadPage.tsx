@@ -57,7 +57,7 @@ export function DownloadPage() {
           ) : (
             <div className="download-button" aria-disabled="true" title={unavailableReason ?? undefined}>
               <span>Download for Windows</span>
-              <span className="size">{unavailableReason ? 'Unavailable (Deployment not configured)' : 'Unavailable'}</span>
+              <span className="size">{unavailableReason ?? 'Unavailable'}</span>
             </div>
           )}
  
@@ -141,10 +141,24 @@ export function DownloadPage() {
           box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
         }
 
+        .download-button[aria-disabled='true'] {
+          background: rgba(255, 255, 255, 0.08);
+          color: rgba(255, 255, 255, 0.6);
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .download-button[aria-disabled='true']:hover {
+          transform: none;
+          box-shadow: none;
+        }
+
         .size {
           font-size: 12px;
           opacity: 0.7;
           margin-top: 4px;
+          max-width: 520px;
+          word-break: break-word;
         }
 
         .requirements {
