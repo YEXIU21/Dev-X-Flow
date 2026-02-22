@@ -57,7 +57,15 @@ export function DownloadPage() {
           ) : (
             <div className="download-button" aria-disabled="true" title={unavailableReason ?? undefined}>
               <span>Download for Windows</span>
-              <span className="size">{unavailableReason ?? 'Unavailable'}</span>
+              <span className="size">Download temporarily unavailable.</span>
+              <a
+                className="download-alt"
+                href="https://github.com/YEXIU21/Dev-X-Flow/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Get the latest build from GitHub Releases
+              </a>
             </div>
           )}
  
@@ -151,6 +159,18 @@ export function DownloadPage() {
         .download-button[aria-disabled='true']:hover {
           transform: none;
           box-shadow: none;
+        }
+
+        .download-alt {
+          margin-top: 10px;
+          font-size: 12px;
+          color: rgba(255, 255, 255, 0.7);
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+
+        .download-alt:hover {
+          color: rgba(0, 212, 255, 0.9);
         }
 
         .size {
