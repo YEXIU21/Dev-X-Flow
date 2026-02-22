@@ -1,3 +1,6 @@
+# Track all EXE files with LFS by default
 *.exe filter=lfs diff=lfs merge=lfs -text
-# Note: devxflow-web/frontend/public/download/*.exe is intentionally NOT tracked by LFS
-# so Vercel can deploy the actual binary (81MB < 100MB GitHub limit)
+
+# EXCEPTION: Web download folder - must NOT be LFS so Vercel can serve the binary
+# The EXE is 81MB which is under GitHub's 100MB limit for regular files
+devxflow-web/frontend/public/download/*.exe -filter -diff -merge text
