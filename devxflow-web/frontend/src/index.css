@@ -58,6 +58,18 @@ body {
   border-bottom: 1px solid rgba(0, 212, 255, 0.1);
 }
 
+.nav-toggle {
+  display: none;
+  background: none;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: var(--text-secondary);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
 .logo {
   font-size: 24px;
   font-weight: 700;
@@ -185,6 +197,10 @@ body {
 .nav-profile svg {
   width: 18px;
   height: 18px;
+}
+
+.nav-login-label {
+  display: none;
 }
 
 .btn-buy {
@@ -1012,23 +1028,217 @@ body {
 }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .nav { padding: 15px 20px; }
+  .logo { font-size: 20px; }
+  .nav-toggle { display: inline-flex; }
+  .nav-links {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px 24px;
+    background: rgba(10, 10, 15, 0.98);
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+  }
+  .nav-links.is-open { display: flex; }
+  .nav-links a, .dropdown-trigger { width: 100%; justify-content: flex-start; }
+  .nav-dropdown { width: 100%; }
+}
+
 @media (max-width: 768px) {
   .hero h1 { font-size: 36px; }
   .nav { padding: 15px 20px; }
+  .logo {
+    font-size: 20px;
+  }
+  .nav-toggle {
+    display: inline-flex;
+  }
   .nav-links {
-    display: flex;
-    gap: 16px;
-    overflow-x: auto;
-    white-space: nowrap;
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px 24px;
+    background: rgba(10, 10, 15, 0.98);
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    max-width: 70vw;
-    padding-bottom: 2px;
+  }
+
+  .nav-links.is-open {
+    display: flex;
+  }
+
+  .nav-links a,
+  .dropdown-trigger {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .nav-dropdown {
+    width: 100%;
+    position: static;
+  }
+
+  .dropdown-content {
+    position: static !important;
+    display: none !important;
+    box-shadow: none;
+    border-radius: 10px;
+    margin-top: 8px;
+    width: 100%;
+    border: 1px solid rgba(0, 212, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .nav-dropdown.is-open .dropdown-content {
+    display: flex !important;
+  }
+
+  .nav-dropdown:hover .dropdown-content {
+    display: none !important;
+  }
+
+  .nav-dropdown.is-open:hover .dropdown-content {
+    display: flex !important;
+  }
+
+  @media (hover: none) {
+    .nav-dropdown:hover .dropdown-content {
+      display: none !important;
+    }
+  }
+
+  .nav-login-label {
+    display: inline-block;
+    margin-left: 0;
+    font-size: 14px;
+    color: #ffffff;
+  }
+
+  .nav-profile {
+    width: 100%;
+    height: 44px;
+    min-width: 0;
+    max-width: none;
+    min-height: 44px;
+    max-height: none;
+    aspect-ratio: auto;
+    border-radius: 10px;
+    gap: 6px;
+    margin-top: 6px;
+    background: #0a0a0f;
+    border: 1px solid rgba(0, 212, 255, 0.6);
+    box-shadow: none;
+    color: #ffffff;
+  }
+
+  .nav-links a.nav-profile {
+    justify-content: flex-start;
+    padding: 0 14px;
+    border-color: rgba(0, 212, 255, 0.6) !important;
+  }
+
+  .nav-profile svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .nav-profile:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .nav-links a.nav-profile:hover {
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.25);
+    border-color: rgba(0, 212, 255, 0.6);
+  }
+
+  .nav-links a.nav-profile:focus-visible {
+    outline: 2px solid rgba(0, 212, 255, 0.8);
+    outline-offset: 2px;
   }
   .pricing-card.featured { transform: none; }
   .features { padding: 60px 20px; }
   .pricing { padding: 60px 20px; }
   .code-showcase { padding: 60px 20px; }
   .hero { padding: 80px 20px; }
+}
+
+/* AGGRESSIVE MOBILE DROPDOWN FIX - Must override desktop hover popup */
+@media (max-width: 768px) {
+  /* Force dropdown to be inline block, not floating absolute */
+  body .nav-dropdown {
+    position: static !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  
+  /* When dropdown is open, give it high z-index so it appears above subsequent elements */
+  body .nav-dropdown.is-open {
+    z-index: auto !important;
+  }
+  
+  /* Force dropdown content to be inline in normal flow */
+  body .nav-dropdown .dropdown-content {
+    position: static !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    margin-top: 8px;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    transform: none !important;
+  }
+  
+  /* Hidden by default */
+  body .nav-dropdown .dropdown-content {
+    display: none !important;
+  }
+  
+  /* Only show when is-open class is present - this must win over hover */
+  body .nav-dropdown.is-open .dropdown-content {
+    display: flex !important;
+    flex-direction: column;
+  }
+  
+  /* Kill desktop hover behavior that shows it on hover */
+  body .nav-dropdown:hover .dropdown-content {
+    display: none !important;
+  }
+  
+  /* Force login and download buttons to be static so dropdown pushes them down */
+  body .nav-links a.nav-profile,
+  body .nav-links a.btn-buy {
+    position: static !important;
+    z-index: auto !important;
+  }
+  
+  /* Disable ::after underline on mobile to avoid position: relative stacking context */
+  body .nav-links a::after {
+    display: none !important;
+  }
+  
+  /* Force all nav-links anchors to be static so dropdown flows naturally */
+  body .nav-links a {
+    position: static !important;
+  }
 }
 
 /* Changelog Page Styles */
@@ -1043,6 +1253,89 @@ body {
   max-width: 800px;
   margin: 0 auto;
   padding: 120px 20px 60px;
+}
+
+/* Compare Page Styles */
+.compare-page {
+  min-height: 100vh;
+  padding: 120px 20px 60px;
+}
+
+.compare-container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.compare-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.compare-header h1 {
+  font-size: 44px;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+.compare-header p {
+  color: var(--text-secondary);
+  font-size: 16px;
+  margin: 0;
+}
+
+.compare-table-wrap {
+  border: 1px solid rgba(0, 212, 255, 0.14);
+  border-radius: 12px;
+  overflow-x: auto;
+  background: rgba(18, 18, 26, 0.92);
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+.compare-table th {
+  text-align: left;
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+
+.compare-table td {
+  padding: 12px 16px;
+  color: rgba(255, 255, 255, 0.78);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.compare-table td.is-yes {
+  color: rgba(0, 255, 153, 0.9);
+  font-weight: 700;
+}
+
+.compare-table td.is-no {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 700;
+}
+
+.compare-footnote {
+  text-align: center;
+  margin-top: 28px;
+}
+
+.compare-footnote p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .compare-header h1 {
+    font-size: 32px;
+  }
 }
 
 .changelog-page .header {
@@ -1163,18 +1456,6 @@ body {
 }
 
 @media (max-width: 768px) {
-  .changelog-page .container { padding-top: 100px; }
-  .version-header { flex-wrap: wrap; }
-  .version-badge { margin-left: 0; margin-top: 10px; }
-}
-
-/* Contact Page Styles */
-.contact-page {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100vh;
-}
 
 .contact-container {
   max-width: 1200px;
@@ -1283,6 +1564,7 @@ body {
 .form-group textarea::placeholder {
   color: var(--text-secondary);
   opacity: 0.5;
+}
 }
 
 @media (max-width: 768px) {
@@ -1690,5 +1972,44 @@ body {
   }
   .form-row {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile-only navbar overrides: force dropdown as inline expanding list and disable hover popups */
+@media (max-width: 900px) {
+  .nav-dropdown {
+    position: static !important;
+    width: 100% !important;
+  }
+
+  .dropdown-content {
+    position: static !important;
+    display: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    margin-top: 8px;
+    border: 1px solid rgba(0, 212, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .nav-dropdown.is-open .dropdown-content {
+    display: flex !important;
+  }
+
+  /* Disable hover completely on mobile */
+  .nav-dropdown:hover .dropdown-content {
+    display: none !important;
+  }
+
+  /* Kill desktop hover behavior entirely on touch devices and small screens */
+  @media (hover: none) {
+    .nav-dropdown:hover .dropdown-content {
+      display: none !important;
+    }
+  }
+
+  /* Ensure login button border is visible on mobile */
+  .nav-links a.nav-profile {
+    border-color: rgba(0, 212, 255, 0.6) !important;
   }
 }

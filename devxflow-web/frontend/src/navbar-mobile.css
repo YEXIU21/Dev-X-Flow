@@ -1,0 +1,37 @@
+/* Mobile-only navbar overrides: force dropdown as inline expanding list and disable hover popups */
+@media (max-width: 900px) {
+  .nav-dropdown {
+    position: static !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .dropdown-content {
+    position: static !important;
+    display: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    margin-top: 8px;
+    border: 1px solid rgba(0, 212, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .nav-dropdown.is-open .dropdown-content {
+    display: flex !important;
+  }
+
+  /* Kill desktop hover behavior entirely on touch devices and small screens */
+  @media (hover: none) {
+    .nav-dropdown:hover .dropdown-content {
+      display: none !important;
+    }
+  }
+
+  /* Ensure login button border is visible on mobile */
+  .nav-links a.nav-profile {
+    border-color: rgba(0, 212, 255, 0.6) !important;
+  }
+}

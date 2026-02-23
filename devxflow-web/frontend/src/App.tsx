@@ -11,6 +11,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ContactPage } from './pages/ContactPage'
 import { PaymentPage } from './pages/PaymentPage'
 import { DownloadPage } from './pages/DownloadPage'
+import { ComparePage } from './pages/ComparePage'
 
 // Placeholder pages - to be implemented
 function PricingPage() {
@@ -53,6 +54,7 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/compare" element={<ComparePage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/changelog" element={<ChangelogPage />} />
             <Route path="/payment" element={<PaymentPage />} />
