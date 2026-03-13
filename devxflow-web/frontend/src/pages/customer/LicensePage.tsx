@@ -253,7 +253,7 @@ export function LicensePage() {
                     <button className="btn-secondary" onClick={() => setShowActivateModal(true)}>
                       <Key size={16} /> Activate License
                     </button>
-                    <Link to="/pricing" className="btn-secondary">
+                    <Link to="/#pricing" className="btn-secondary">
                       <CreditCard size={16} /> Buy License
                     </Link>
                   </div>

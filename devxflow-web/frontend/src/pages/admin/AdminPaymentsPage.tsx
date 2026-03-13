@@ -13,6 +13,13 @@ interface Payment {
   license_key: string
 }
 
+const PLAN_NAMES: Record<string, string> = {
+  pro: 'Pro (₱1,499/yr)',
+  pro_plus: 'Pro+ (₱2,499/yr)',
+  teams: 'Teams (₱4,999/yr)',
+  enterprise: 'Enterprise (Custom)'
+}
+
 export function AdminPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,7 +107,7 @@ export function AdminPaymentsPage() {
                 <div>
                   <p className="text-white font-semibold">{payment.customer_name}</p>
                   <p className="text-[#94a3b8] text-sm">{payment.customer_email}</p>
-                  <p className="text-white mt-2">₱{payment.amount} - {payment.plan}</p>
+                  <p className="text-white mt-2">₱{payment.amount} - <span className="text-cyan-400">{PLAN_NAMES[payment.plan] || payment.plan}</span></p>
                   <p className="text-[#94a3b8] text-sm">GCash Ref: {payment.gcash_reference}</p>
                   {payment.license_key && (
                     <p className="text-green-400 text-sm mt-2">License: {payment.license_key}</p>

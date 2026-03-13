@@ -1,15 +1,26 @@
 import { useState } from 'react'
+import emailjs from '@emailjs/browser'
+import { useSearchParams } from 'react-router-dom'
 import { Navbar } from '../components/common/Navbar'
 
+// EmailJS configuration - replace with your actual IDs from emailjs.com
+const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID'
+const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID'
+const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY'
+
 export function ContactPage() {
+  const [searchParams] = useSearchParams()
+  const planParam = searchParams.get('plan')
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subject: '',
+    subject: planParam ? `Enterprise Inquiry (${planParam})` : '',
     message: ''
   })
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -21,13 +32,30 @@ export function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError('')
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        {
+          from_name: formData.name,
+          from_email: formData.email,
+          subject: formData.subject,
+          message: formData.message,
+          to_name: 'DevXFlow Support'
+        },
+        EMAILJS_PUBLIC_KEY
+      )
+      
       setIsSubmitted(true)
-      setIsLoading(false)
       setFormData({ name: '', email: '', subject: '', message: '' })
-    }, 1500)
+    } catch (err) {
+      console.error('EmailJS error:', err)
+      setError('Failed to send message. Please try again or email us directly at support@devxflow.com')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -72,6 +100,7 @@ export function ContactPage() {
               </div>
             ) : (
               <form className="contact-form" onSubmit={handleSubmit}>
+                {error && <div className="error-message">{error}</div>}
                 <div className="form-group">
                   <label htmlFor="name">Name</label>
                   <input

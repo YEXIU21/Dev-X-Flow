@@ -1,13 +1,39 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const { models } = require('../database');
-const auth = require('./auth');
 
 const router = express.Router();
+const JWT_SECRET = process.env.JWT_SECRET || 'devxflow-customer-secret-key';
+
+// Customer token verification middleware
+function verifyCustomerToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    if (decoded.role !== 'customer') {
+      return res.status(403).json({ error: 'Access denied. Customer role required.' });
+    }
+    
+    req.customerId = decoded.customerId;
+    req.customerEmail = decoded.email;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
 
 // Get current customer's license status
-router.get('/status', auth.verifyToken, async (req, res) => {
+router.get('/status', verifyCustomerToken, async (req, res) => {
   try {
-    const customer = await models.Customer.findById(req.userId).lean();
+    const customer = await models.Customer.findById(req.customerId).lean();
     
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
@@ -69,9 +95,9 @@ router.get('/status', auth.verifyToken, async (req, res) => {
 });
 
 // Start trial
-router.post('/trial/start', auth.verifyToken, async (req, res) => {
+router.post('/trial/start', verifyCustomerToken, async (req, res) => {
   try {
-    const customer = await models.Customer.findById(req.userId);
+    const customer = await models.Customer.findById(req.customerId);
     
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
@@ -113,7 +139,7 @@ router.post('/trial/start', auth.verifyToken, async (req, res) => {
 });
 
 // Activate a license key
-router.post('/activate', auth.verifyToken, async (req, res) => {
+router.post('/activate', verifyCustomerToken, async (req, res) => {
   try {
     const { license_key, device_id, device_name } = req.body;
 
@@ -123,7 +149,7 @@ router.post('/activate', auth.verifyToken, async (req, res) => {
       });
     }
 
-    const customer = await models.Customer.findById(req.userId);
+    const customer = await models.Customer.findById(req.customerId);
     
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
@@ -212,10 +238,10 @@ router.post('/activate', auth.verifyToken, async (req, res) => {
 });
 
 // Deactivate a device
-router.delete('/device/:device_id', auth.verifyToken, async (req, res) => {
+router.delete('/device/:device_id', verifyCustomerToken, async (req, res) => {
   try {
     const { device_id } = req.params;
-    const customer = await models.Customer.findById(req.userId).lean();
+    const customer = await models.Customer.findById(req.customerId).lean();
     
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
@@ -253,9 +279,9 @@ router.delete('/device/:device_id', auth.verifyToken, async (req, res) => {
 });
 
 // Get billing history
-router.get('/billing', auth.verifyToken, async (req, res) => {
+router.get('/billing', verifyCustomerToken, async (req, res) => {
   try {
-    const customer = await models.Customer.findById(req.userId).lean();
+    const customer = await models.Customer.findById(req.customerId).lean();
     
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
