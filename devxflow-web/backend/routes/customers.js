@@ -44,6 +44,33 @@ router.post('/register', async (req, res) => {
             name: name
         });
         
+        // Check if email is in any enterprise team_members (auto-link)
+        const enterpriseLicense = await models.License.findOne({
+            'team_members.email': email.toLowerCase(),
+            'team_members.status': 'pending'
+        });
+        
+        if (enterpriseLicense) {
+            // Update team member status to active
+            const memberIndex = enterpriseLicense.team_members.findIndex(
+                m => m.email === email.toLowerCase() && m.status === 'pending'
+            );
+            
+            if (memberIndex !== -1) {
+                enterpriseLicense.team_members[memberIndex].status = 'active';
+                enterpriseLicense.team_members[memberIndex].activated_at = new Date();
+                await enterpriseLicense.save();
+            }
+            
+            // Link customer to enterprise
+            customer.enterprise_id = enterpriseLicense._id;
+            customer.enterprise_role = 'member';
+            customer.status = 'enterprise';
+            await customer.save();
+            
+            console.log(`[Enterprise] Auto-linked ${email} to license ${enterpriseLicense.license_key}`);
+        }
+        
         // Generate JWT
         const token = jwt.sign(
             { 
@@ -62,8 +89,15 @@ router.post('/register', async (req, res) => {
             customer: {
                 id: customer._id,
                 email: customer.email,
-                name: customer.name
-            }
+                name: customer.name,
+                status: customer.status,
+                enterprise_id: customer.enterprise_id,
+                enterprise_role: customer.enterprise_role
+            },
+            enterprise: enterpriseLicense ? {
+                linked: true,
+                license_key: enterpriseLicense.license_key.substring(0, 4) + '-****'
+            } : null
         });
         
     } catch (error) {

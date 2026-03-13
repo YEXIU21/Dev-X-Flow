@@ -5,6 +5,8 @@ interface Customer {
   email: string
   name: string
   status: string
+  enterprise_id?: string
+  enterprise_role?: 'admin' | 'member' | null
   api_keys?: Record<string, { key: string; added_at: string }>
   license?: {
     key: string

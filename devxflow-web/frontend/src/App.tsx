@@ -21,6 +21,7 @@ import { AdminMessagesPage } from './pages/admin/AdminMessagesPage'
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage'
 import { SettingsPage } from './pages/customer/SettingsPage'
 import { LicensePage } from './pages/customer/LicensePage'
+import { EnterpriseDashboard } from './pages/enterprise/EnterpriseDashboard'
 
 // Placeholder pages - to be implemented
 function PricingPage() {
@@ -74,6 +75,7 @@ function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/license" element={<LicensePage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/enterprise" element={<EnterpriseDashboard />} />
             </Route>
 
             {/* Admin Routes */}

@@ -174,6 +174,75 @@ router.post('/activate', verifyCustomerToken, async (req, res) => {
       });
     }
 
+    // Enterprise license handling
+    if (license.tier === 'enterprise') {
+      // Check if customer email matches license owner or is in team_members
+      const isOwner = license.customer_email === customer.email;
+      const isTeamMember = license.team_members?.some(m => m.email === customer.email);
+      
+      if (!isOwner && !isTeamMember) {
+        // First activation - set as enterprise admin
+        if (!license.customer_email) {
+          license.customer_email = customer.email;
+          customer.enterprise_id = license._id;
+          customer.enterprise_role = 'admin';
+          customer.status = 'enterprise';
+          
+          // Add to team_members as admin
+          if (!license.team_members) license.team_members = [];
+          license.team_members.push({
+            email: customer.email,
+            status: 'active',
+            added_at: new Date(),
+            activated_at: new Date()
+          });
+          license.seats_used = license.team_members.length;
+          
+          await license.save();
+          await customer.save();
+        } else {
+          // Not in team - check if seats available
+          if (license.seats_used >= license.seats) {
+            return res.status(400).json({ 
+              error: 'No seats available in this enterprise license. Contact your administrator.' 
+            });
+          }
+          
+          // Add as team member
+          if (!license.team_members) license.team_members = [];
+          license.team_members.push({
+            email: customer.email,
+            status: 'active',
+            added_at: new Date(),
+            activated_at: new Date()
+          });
+          license.seats_used = license.team_members.length;
+          
+          customer.enterprise_id = license._id;
+          customer.enterprise_role = 'member';
+          customer.status = 'enterprise';
+          
+          await license.save();
+          await customer.save();
+        }
+      } else if (isTeamMember) {
+        // Already in team - update status if pending
+        const memberIndex = license.team_members.findIndex(m => m.email === customer.email);
+        if (license.team_members[memberIndex].status === 'pending') {
+          license.team_members[memberIndex].status = 'active';
+          license.team_members[memberIndex].activated_at = new Date();
+          await license.save();
+        }
+        
+        customer.enterprise_id = license._id;
+        if (!customer.enterprise_role) {
+          customer.enterprise_role = isOwner ? 'admin' : 'member';
+        }
+        customer.status = 'enterprise';
+        await customer.save();
+      }
+    }
+
     // Check activation limit
     const existingActivations = await models.Activation.countDocuments({ 
       license_id: license._id 
@@ -208,8 +277,8 @@ router.post('/activate', verifyCustomerToken, async (req, res) => {
       { upsert: true, new: true }
     );
 
-    // Update license customer email if not set
-    if (!license.customer_email) {
+    // Update license customer email if not set (non-enterprise)
+    if (!license.customer_email && license.tier !== 'enterprise') {
       license.customer_email = customer.email;
       await license.save();
     }
@@ -228,6 +297,11 @@ router.post('/activate', verifyCustomerToken, async (req, res) => {
         name: device_name || 'Unknown Device',
         activated_at: activation.activated_at
       },
+      enterprise: license.tier === 'enterprise' ? {
+        role: customer.enterprise_role,
+        seats: license.seats,
+        seats_used: license.seats_used
+      } : null,
       features: getTierFeatures(license.tier || 'pro')
     });
 
@@ -345,6 +419,16 @@ function getTierFeatures(tier) {
       'Dedicated support',
       'Custom branding',
       'On-premise option'
+    ],
+    enterprise: [
+      'Everything in Teams',
+      'Unlimited seats',
+      'Dedicated account manager',
+      'Custom SLA',
+      'On-premise deployment',
+      'Priority feature requests',
+      'Enterprise SSO/SAML',
+      'Audit logs'
     ]
   };
   

@@ -27,8 +27,17 @@ const licenseSchema = new mongoose.Schema({
     license_key: { type: String, required: true, unique: true },
     customer_email: { type: String },
     status: { type: String, default: 'active' },
-    tier: { type: String, default: 'pro', enum: ['free', 'pro', 'pro_plus', 'teams'] },
+    tier: { type: String, default: 'pro', enum: ['free', 'pro', 'pro_plus', 'teams', 'enterprise'] },
     max_activations: { type: Number, default: 3 },
+    // Enterprise fields
+    seats: { type: Number, default: 1 },
+    seats_used: { type: Number, default: 0 },
+    team_members: [{
+        email: { type: String, required: true },
+        status: { type: String, enum: ['pending', 'active'], default: 'pending' },
+        added_at: { type: Date, default: Date.now },
+        activated_at: { type: Date }
+    }],
     created_at: { type: Date, default: Date.now },
     expires_at: { type: Date },
     revoked_at: { type: Date }
@@ -102,7 +111,10 @@ const customerSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password_hash: { type: String, required: true },
     name: { type: String, required: true },
-    status: { type: String, default: 'active' },
+    status: { type: String, default: 'active', enum: ['active', 'trial', 'enterprise'] },
+    // Enterprise fields
+    enterprise_id: { type: mongoose.Schema.Types.ObjectId, ref: 'License' },
+    enterprise_role: { type: String, enum: ['admin', 'member'], default: null },
     api_keys: {
         openai: { key: String, added_at: Date },
         anthropic: { key: String, added_at: Date },
