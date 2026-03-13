@@ -17,6 +17,7 @@ const connectDB = async () => {
 // Admin Schema
 const adminSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
     password_hash: { type: String, required: true },
     created_at: { type: Date, default: Date.now }
 });
@@ -53,14 +54,24 @@ const validationLogSchema = new mongoose.Schema({
 
 // Payment Schema
 const paymentSchema = new mongoose.Schema({
-    payment_intent_id: { type: String, unique: true },
+    payment_intent_id: { type: String, unique: true, sparse: true },
     customer_email: { type: String, required: true },
+    customer_name: { type: String, required: true },
     amount: { type: Number, required: true },
-    status: { type: String, default: 'pending' },
+    plan: { type: String, required: true, enum: ['basic', 'professional'] },
+    status: { 
+        type: String, 
+        enum: ['pending', 'verified', 'rejected'],
+        default: 'pending' 
+    },
+    gcash_reference: { type: String },
+    proof_image_url: { type: String },
     reference_number: { type: String },
     created_at: { type: Date, default: Date.now },
     paid_at: { type: Date },
-    verified_at: { type: Date }
+    verified_at: { type: Date },
+    verified_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+    license_key: { type: String }
 });
 
 // Message Schema
@@ -91,6 +102,18 @@ const customerSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password_hash: { type: String, required: true },
     name: { type: String, required: true },
+    status: { type: String, default: 'active' },
+    api_keys: {
+        openai: { key: String, added_at: Date },
+        anthropic: { key: String, added_at: Date },
+        google: { key: String, added_at: Date },
+        deepseek: { key: String, added_at: Date },
+        mistral: { key: String, added_at: Date },
+        openrouter: { key: String, added_at: Date }
+    },
+    license_id: { type: mongoose.Schema.Types.ObjectId, ref: 'License' },
+    trial_started_at: { type: Date },
+    trial_expires_at: { type: Date },
     created_at: { type: Date, default: Date.now },
     last_login: { type: Date }
 });

@@ -1,154 +1,141 @@
 const express = require('express');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
+const streamifier = require('streamifier');
 const { models } = require('../database');
 const auth = require('./auth');
 
 const router = express.Router();
 
-// PayMongo configuration (test mode by default)
-const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY || 'sk_test_key_here';
-const PAYMONGO_PUBLIC_KEY = process.env.PAYMONGO_PUBLIC_KEY || 'pk_test_key_here';
-const PAYMONGO_API_URL = 'https://api.paymongo.com/v1';
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-// Create payment intent for GCash
-router.post('/create-intent', async (req, res) => {
+// Configure Multer for file uploads (in-memory storage)
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+// Plan pricing (in PHP)
+const PLAN_PRICES = {
+    'basic': 399,
+    'professional': 899
+};
+
+// Get GCash QR code URL
+router.get('/qr', (req, res) => {
     try {
-        const { email, amount = 99900 } = req.body; // Amount in centavos (₱999 = 99900)
-        
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
-        }
-        
-        // Create payment intent via PayMongo API
-        const response = await fetch(`${PAYMONGO_API_URL}/payment_intents`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY).toString('base64')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                data: {
-                    attributes: {
-                        amount: amount,
-                        currency: 'PHP',
-                        payment_method_allowed: ['gcash'],
-                        description: 'Dev-X-Flow License',
-                        metadata: {
-                            customer_email: email
-                        }
-                    }
-                }
-            })
+        const qrPublicId = process.env.GCASH_QR_PUBLIC_ID || 'devxflow-gcash-qr';
+        const qrUrl = cloudinary.url(qrPublicId, {
+            secure: true,
+            transformation: { width: 400, height: 400, crop: 'fill' }
         });
         
-        const data = await response.json();
+        res.json({
+            success: true,
+            qr_url: qrUrl,
+            gcash_number: process.env.GCASH_NUMBER || '09XX XXX XXXX'
+        });
+    } catch (error) {
+        console.error('QR fetch error:', error);
+        res.status(500).json({ error: 'Failed to get QR code' });
+    }
+});
+
+// Submit payment proof (QR-based GCash payment)
+router.post('/submit-proof', upload.single('screenshot'), async (req, res) => {
+    try {
+        const { email, name, plan, gcash_ref } = req.body;
         
-        if (!response.ok) {
-            console.error('PayMongo error:', data);
-            return res.status(500).json({ 
-                error: 'Failed to create payment intent',
-                details: data.errors 
+        // Validate required fields
+        if (!email || !name || !plan || !gcash_ref) {
+            return res.status(400).json({ 
+                error: 'Email, name, plan, and GCash reference are required' 
             });
         }
         
-        // Store pending payment in database using MongoDB
+        if (!['basic', 'professional'].includes(plan)) {
+            return res.status(400).json({ 
+                error: 'Invalid plan. Must be "basic" or "professional"' 
+            });
+        }
+        
+        if (!req.file) {
+            return res.status(400).json({ 
+                error: 'Payment screenshot is required' 
+            });
+        }
+        
+        // Upload screenshot to Cloudinary
+        const uploadFromBuffer = () => {
+            return new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { 
+                        folder: 'payment-proofs',
+                        resource_type: 'image'
+                    },
+                    (error, result) => {
+                        if (error) reject(error);
+                        else resolve(result);
+                    }
+                );
+                streamifier.createReadStream(req.file.buffer).pipe(stream);
+            });
+        };
+        
+        const uploadResult = await uploadFromBuffer();
+        
+        // Create payment record
         const payment = new models.Payment({
-            payment_intent_id: data.data.id,
             customer_email: email,
-            amount: amount / 100,
+            customer_name: name,
+            amount: PLAN_PRICES[plan],
+            plan: plan,
+            gcash_reference: gcash_ref,
+            proof_image_url: uploadResult.secure_url,
             status: 'pending'
         });
         await payment.save();
         
+        console.log(`Payment submitted: ${payment._id} by ${email}`);
+        
         res.json({
             success: true,
-            client_key: data.data.attributes.client_key,
-            payment_intent_id: data.data.id,
-            amount: amount / 100
+            payment_id: payment._id,
+            message: 'Payment submitted successfully. We will verify and send your license key within 24 hours.'
         });
         
     } catch (error) {
-        console.error('Payment intent error:', error);
-        res.status(500).json({ error: 'Payment initialization failed' });
+        console.error('Payment submission error:', error);
+        res.status(500).json({ error: 'Payment submission failed' });
     }
 });
 
-// Webhook handler for PayMongo events
-router.post('/webhook', async (req, res) => {
+// Check payment status by ID
+router.get('/status/:paymentId', async (req, res) => {
     try {
-        const event = req.body;
+        const { paymentId } = req.params;
         
-        // Verify webhook signature (in production)
-        // const signature = req.headers['paymongo-signature'];
-        
-        console.log('PayMongo webhook received:', event.type);
-        
-        if (event.type === 'payment.paid') {
-            const paymentIntentId = event.data.attributes.payment_intent.id;
-            const payment = await models.Payment.findOne({ payment_intent_id: paymentIntentId });
-            
-            if (payment && payment.status === 'pending') {
-                // Update payment status
-                payment.status = 'paid';
-                payment.paid_at = new Date();
-                await payment.save();
-                
-                // Generate license key
-                const { v4: uuidv4 } = require('uuid');
-                const licenseKey = uuidv4().toUpperCase().replace(/-/g, '').substring(0, 16);
-                const formattedKey = `${licenseKey.substring(0, 4)}-${licenseKey.substring(4, 8)}-${licenseKey.substring(8, 12)}-${licenseKey.substring(12, 16)}`;
-                
-                // Create license in MongoDB
-                const expiresAt = new Date();
-                expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year license
-                
-                const license = new models.License({
-                    license_key: formattedKey,
-                    customer_email: payment.customer_email,
-                    max_activations: 3,
-                    expires_at: expiresAt
-                });
-                await license.save();
-                
-                console.log(`License generated for ${payment.customer_email}: ${formattedKey}`);
-                
-                // TODO: Send email with license key
-                // For now, just log it
-            }
-        }
-        
-        res.json({ received: true });
-        
-    } catch (error) {
-        console.error('Webhook error:', error);
-        res.status(500).json({ error: 'Webhook processing failed' });
-    }
-});
-
-// Check payment status
-router.get('/status/:paymentIntentId', async (req, res) => {
-    try {
-        const { paymentIntentId } = req.params;
-        
-        const payment = await models.Payment.findOne({ payment_intent_id: paymentIntentId });
+        const payment = await models.Payment.findById(paymentId);
         
         if (!payment) {
             return res.status(404).json({ error: 'Payment not found' });
-        }
-        
-        // Get associated license if paid (search by customer email)
-        let license = null;
-        if (payment.status === 'paid') {
-            license = await models.License.findOne({ 
-                customer_email: payment.customer_email 
-            }).sort({ created_at: -1 });
         }
         
         res.json({
             success: true,
             status: payment.status,
             amount: payment.amount,
-            license_key: license ? license.license_key : null
+            plan: payment.plan,
+            license_key: payment.license_key || null,
+            submitted_at: payment.created_at,
+            verified_at: payment.verified_at
         });
         
     } catch (error) {
@@ -157,49 +144,185 @@ router.get('/status/:paymentIntentId', async (req, res) => {
     }
 });
 
-// Manual payment verification (for admin)
-router.post('/verify-manual', auth.verifyToken, async (req, res) => {
+// Get all payments for current user (by email)
+router.get('/my-payments', async (req, res) => {
     try {
-        const { payment_id, reference_number } = req.body;
+        const { email } = req.query;
         
-        // Get payment first
-        const payment = await models.Payment.findById(payment_id);
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+        
+        const payments = await models.Payment.find({ customer_email: email })
+            .sort({ created_at: -1 })
+            .select('-proof_image_url'); // Don't return proof image URL
+        
+        res.json({
+            success: true,
+            payments: payments
+        });
+        
+    } catch (error) {
+        console.error('My payments error:', error);
+        res.status(500).json({ error: 'Failed to fetch payments' });
+    }
+});
+
+// ============================================
+// ADMIN ROUTES (require authentication)
+// ============================================
+
+// Get all pending payments (admin)
+router.get('/admin/pending', auth.verifyToken, auth.isAdmin, async (req, res) => {
+    try {
+        const payments = await models.Payment.find({ status: 'pending' })
+            .sort({ created_at: -1 });
+        
+        res.json({
+            success: true,
+            count: payments.length,
+            payments: payments
+        });
+        
+    } catch (error) {
+        console.error('Pending payments error:', error);
+        res.status(500).json({ error: 'Failed to fetch pending payments' });
+    }
+});
+
+// Get all payments (admin)
+router.get('/admin/all', auth.verifyToken, auth.isAdmin, async (req, res) => {
+    try {
+        const { status, limit = 50 } = req.query;
+        
+        const filter = status ? { status } : {};
+        const payments = await models.Payment.find(filter)
+            .sort({ created_at: -1 })
+            .limit(parseInt(limit))
+            .populate('verified_by', 'username');
+        
+        res.json({
+            success: true,
+            count: payments.length,
+            payments: payments
+        });
+        
+    } catch (error) {
+        console.error('All payments error:', error);
+        res.status(500).json({ error: 'Failed to fetch payments' });
+    }
+});
+
+// Verify payment and generate license (admin)
+router.post('/admin/verify/:paymentId', auth.verifyToken, auth.isAdmin, async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        
+        const payment = await models.Payment.findById(paymentId);
+        
         if (!payment) {
             return res.status(404).json({ error: 'Payment not found' });
         }
         
-        // Update payment as verified
-        payment.status = 'paid';
-        payment.reference_number = reference_number;
-        payment.verified_at = new Date();
-        await payment.save();
+        if (payment.status !== 'pending') {
+            return res.status(400).json({ 
+                error: `Payment already ${payment.status}` 
+            });
+        }
         
-        // Generate license
-        const { v4: uuidv4 } = require('uuid');
+        // Generate license key
         const licenseKey = uuidv4().toUpperCase().replace(/-/g, '').substring(0, 16);
         const formattedKey = `${licenseKey.substring(0, 4)}-${licenseKey.substring(4, 8)}-${licenseKey.substring(8, 12)}-${licenseKey.substring(12, 16)}`;
         
+        // Calculate expiration based on plan
         const expiresAt = new Date();
-        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+        if (payment.plan === 'basic') {
+            expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year
+        } else {
+            expiresAt.setFullYear(expiresAt.getFullYear() + 3); // 3 years
+        }
         
+        // Create license
         const license = new models.License({
             license_key: formattedKey,
             customer_email: payment.customer_email,
-            max_activations: 3,
+            tier: payment.plan === 'basic' ? 'pro' : 'pro_plus',
+            max_activations: payment.plan === 'basic' ? 3 : 5,
             expires_at: expiresAt
         });
         await license.save();
         
+        // Update payment status
+        payment.status = 'verified';
+        payment.verified_at = new Date();
+        payment.verified_by = req.user.adminId;
+        payment.license_key = formattedKey;
+        await payment.save();
+        
+        console.log(`Payment verified: ${paymentId} - License: ${formattedKey}`);
+        
         res.json({
             success: true,
             license_key: formattedKey,
+            customer_email: payment.customer_email,
             message: 'Payment verified and license generated'
         });
         
     } catch (error) {
-        console.error('Manual verification error:', error);
+        console.error('Verification error:', error);
         res.status(500).json({ error: 'Verification failed' });
     }
+});
+
+// Reject payment (admin)
+router.post('/admin/reject/:paymentId', auth.verifyToken, auth.isAdmin, async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        const { reason } = req.body;
+        
+        const payment = await models.Payment.findById(paymentId);
+        
+        if (!payment) {
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+        
+        if (payment.status !== 'pending') {
+            return res.status(400).json({ 
+                error: `Payment already ${payment.status}` 
+            });
+        }
+        
+        // Update payment status
+        payment.status = 'rejected';
+        payment.verified_at = new Date();
+        payment.verified_by = req.user.adminId;
+        await payment.save();
+        
+        console.log(`Payment rejected: ${paymentId} - Reason: ${reason || 'No reason provided'}`);
+        
+        res.json({
+            success: true,
+            message: 'Payment rejected'
+        });
+        
+    } catch (error) {
+        console.error('Rejection error:', error);
+        res.status(500).json({ error: 'Rejection failed' });
+    }
+});
+
+// Legacy routes for backward compatibility (PayMongo - kept but not used)
+// Create payment intent for GCash (PayMongo - legacy)
+router.post('/create-intent', async (req, res) => {
+    res.status(400).json({ 
+        error: 'PayMongo integration disabled. Please use QR-based payment.',
+        use_qr_payment: true
+    });
+});
+
+// Webhook handler for PayMongo events (legacy)
+router.post('/webhook', async (req, res) => {
+    res.json({ received: true, message: 'PayMongo webhooks disabled' });
 });
 
 module.exports = router;

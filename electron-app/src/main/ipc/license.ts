@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell } from 'electron'
+import { ipcMain, BrowserWindow, shell, app } from 'electron'
 import { LicenseService, LicenseTier } from '../license'
 
 export function registerLicenseIPC() {
@@ -52,7 +52,6 @@ export function registerLicenseIPC() {
   ipcMain.handle('license:deactivate', async () => {
     try {
       // Clear stored license
-      const { app } = await import('electron')
       const path = await import('node:path')
       const fs = await import('node:fs')
 
@@ -100,6 +99,62 @@ export function registerLicenseIPC() {
   ipcMain.handle('license:buy', async () => {
     await shell.openExternal('https://devxflow.com/pricing')
   })
+
+  // Login - open browser for authentication
+  ipcMain.handle('license:login', async () => {
+    licenseService.openLoginInBrowser()
+    return { success: true }
+  })
+
+  // Start free trial
+  ipcMain.handle('license:start-trial', async () => {
+    try {
+      const result = await licenseService.startTrial()
+      if (result.success && result.trial) {
+        // Broadcast trial status to windows
+        BrowserWindow.getAllWindows().forEach(window => {
+          window.webContents.send('license:trial-started', result.trial)
+        })
+      }
+      return result
+    } catch (error) {
+      return { success: false, error: 'Failed to start trial' }
+    }
+  })
+
+  // Check trial status
+  ipcMain.handle('license:trial-status', async () => {
+    try {
+      const status = await licenseService.checkTrialStatus()
+      return status
+    } catch (error) {
+      return { active: false, days_remaining: 0 }
+    }
+  })
+
+  // Check auth status
+  ipcMain.handle('license:auth-status', async () => {
+    try {
+      const status = await licenseService.getAuthStatus()
+      return status
+    } catch (error) {
+      return { authenticated: false }
+    }
+  })
+}
+
+// Handle deep link auth callback (called from main when protocol triggered)
+export async function handleAuthCallback(token: string) {
+  const licenseService = LicenseService.getInstance()
+  const status = await licenseService.handleAuthCallback(token)
+  
+  if (status.authenticated) {
+    BrowserWindow.getAllWindows().forEach(window => {
+      window.webContents.send('license:auth-success', status)
+    })
+  }
+  
+  return status
 }
 
 export function broadcastLicenseExpired() {

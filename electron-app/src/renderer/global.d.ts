@@ -164,8 +164,14 @@ declare global {
       licenseGetTier: () => Promise<{ tier: string }>
       licenseCheckFeature: (feature: string) => Promise<{ available: boolean }>
       licenseBuy: () => Promise<void>
+      licenseLogin: () => Promise<{ success: boolean }>
+      licenseStartTrial: () => Promise<{ success: boolean; trial?: { active: boolean; expires_at: string; days_remaining: number }; error?: string }>
+      licenseTrialStatus: () => Promise<{ active: boolean; days_remaining: number; expires_at?: string }>
+      licenseAuthStatus: () => Promise<{ authenticated: boolean; user?: { id: string; email: string; name: string }; trial?: { active: boolean; expires_at: string; days_remaining: number }; license?: { key: string; tier: string } }>
       onLicenseStatus: (callback: (status: { valid: boolean; tier: string; expires_at?: string | null }) => void) => (() => void)
       onLicenseExpired: (callback: () => void) => (() => void)
+      onLicenseTrialStarted: (callback: (trial: { active: boolean; expires_at: string; days_remaining: number }) => void) => (() => void)
+      onLicenseAuthSuccess: (callback: (status: { authenticated: boolean; user?: { id: string; email: string; name: string }; trial?: { active: boolean; expires_at: string; days_remaining: number }; license?: { key: string; tier: string } }) => void) => (() => void)
     }
   }
 }

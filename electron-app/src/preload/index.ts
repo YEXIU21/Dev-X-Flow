@@ -355,6 +355,18 @@ contextBridge.exposeInMainWorld('devxflow', {
   licenseBuy: async (): Promise<void> => {
     return await ipcRenderer.invoke('license:buy')
   },
+  licenseLogin: async (): Promise<{ success: boolean }> => {
+    return await ipcRenderer.invoke('license:login')
+  },
+  licenseStartTrial: async (): Promise<{ success: boolean; trial?: { active: boolean; expires_at: string; days_remaining: number }; error?: string }> => {
+    return await ipcRenderer.invoke('license:start-trial')
+  },
+  licenseTrialStatus: async (): Promise<{ active: boolean; days_remaining: number; expires_at?: string }> => {
+    return await ipcRenderer.invoke('license:trial-status')
+  },
+  licenseAuthStatus: async (): Promise<{ authenticated: boolean; user?: { id: string; email: string; name: string }; trial?: { active: boolean; expires_at: string; days_remaining: number }; license?: { key: string; tier: string } }> => {
+    return await ipcRenderer.invoke('license:auth-status')
+  },
   onLicenseStatus: (callback: (status: { valid: boolean; tier: string; expires_at?: string | null }) => void) => {
     const handler = (_event: unknown, status: { valid: boolean; tier: string; expires_at?: string | null }) => callback(status)
     ipcRenderer.on('license:status', handler)
@@ -364,5 +376,15 @@ contextBridge.exposeInMainWorld('devxflow', {
     const handler = () => callback()
     ipcRenderer.on('license:expired', handler)
     return () => ipcRenderer.removeListener('license:expired', handler)
+  },
+  onLicenseTrialStarted: (callback: (trial: { active: boolean; expires_at: string; days_remaining: number }) => void) => {
+    const handler = (_event: unknown, trial: { active: boolean; expires_at: string; days_remaining: number }) => callback(trial)
+    ipcRenderer.on('license:trial-started', handler)
+    return () => ipcRenderer.removeListener('license:trial-started', handler)
+  },
+  onLicenseAuthSuccess: (callback: (status: { authenticated: boolean; user?: { id: string; email: string; name: string }; trial?: { active: boolean; expires_at: string; days_remaining: number }; license?: { key: string; tier: string } }) => void) => {
+    const handler = (_event: unknown, status: { authenticated: boolean; user?: { id: string; email: string; name: string }; trial?: { active: boolean; expires_at: string; days_remaining: number }; license?: { key: string; tier: string } }) => callback(status)
+    ipcRenderer.on('license:auth-success', handler)
+    return () => ipcRenderer.removeListener('license:auth-success', handler)
   },
 })

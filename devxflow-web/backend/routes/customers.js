@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../database');
+const { models } = require('../database');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'devxflow-customer-secret-key';
@@ -23,15 +23,12 @@ router.post('/register', async (req, res) => {
         }
         
         // Password strength
-        if (password.length < 8) {
-            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
         
         // Check if email already exists
-        const existingUser = await db.get(
-            'SELECT id FROM customers WHERE email = ?',
-            [email.toLowerCase()]
-        );
+        const existingUser = await models.Customer.findOne({ email: email.toLowerCase() });
         
         if (existingUser) {
             return res.status(409).json({ error: 'Email already registered' });
@@ -41,16 +38,16 @@ router.post('/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 10);
         
         // Create customer
-        const result = await db.run(
-            `INSERT INTO customers (email, password_hash, name, created_at) 
-             VALUES (?, ?, ?, datetime('now'))`,
-            [email.toLowerCase(), passwordHash, name]
-        );
+        const customer = await models.Customer.create({
+            email: email.toLowerCase(),
+            password_hash: passwordHash,
+            name: name
+        });
         
         // Generate JWT
         const token = jwt.sign(
             { 
-                customerId: result.id, 
+                customerId: customer._id, 
                 email: email.toLowerCase(),
                 role: 'customer'
             },
@@ -63,9 +60,9 @@ router.post('/register', async (req, res) => {
             message: 'Registration successful',
             token,
             customer: {
-                id: result.id,
-                email: email.toLowerCase(),
-                name
+                id: customer._id,
+                email: customer.email,
+                name: customer.name
             }
         });
         
@@ -85,10 +82,7 @@ router.post('/login', async (req, res) => {
         }
         
         // Find customer
-        const customer = await db.get(
-            'SELECT * FROM customers WHERE email = ?',
-            [email.toLowerCase()]
-        );
+        const customer = await models.Customer.findOne({ email: email.toLowerCase() });
         
         if (!customer) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -101,10 +95,14 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         
+        // Update last login
+        customer.last_login = new Date();
+        await customer.save();
+        
         // Generate JWT
         const token = jwt.sign(
             { 
-                customerId: customer.id, 
+                customerId: customer._id, 
                 email: customer.email,
                 role: 'customer'
             },
@@ -116,7 +114,7 @@ router.post('/login', async (req, res) => {
             success: true,
             token,
             customer: {
-                id: customer.id,
+                id: customer._id,
                 email: customer.email,
                 name: customer.name
             }
@@ -131,31 +129,33 @@ router.post('/login', async (req, res) => {
 // Get customer profile
 router.get('/profile', verifyCustomerToken, async (req, res) => {
     try {
-        const customer = await db.get(
-            `SELECT id, email, name, created_at,
-                    datetime(last_login) as last_login
-             FROM customers WHERE id = ?`,
-            [req.customerId]
-        );
+        const customer = await models.Customer.findById(req.customerId);
         
         if (!customer) {
             return res.status(404).json({ error: 'Customer not found' });
         }
         
         // Get customer's licenses
-        const licenses = await db.all(
-            `SELECT license_key, status, created_at, expires_at,
-                    (SELECT COUNT(*) FROM activations WHERE license_id = licenses.id) as activation_count
-             FROM licenses 
-             WHERE customer_email = ?
-             ORDER BY created_at DESC`,
-            [customer.email]
-        );
+        const licenses = await models.License.find({ customer_email: customer.email })
+            .sort({ created_at: -1 })
+            .lean();
+        
+        // Get activation counts
+        const licensesWithCounts = await Promise.all(licenses.map(async (license) => {
+            const count = await models.Activation.countDocuments({ license_id: license._id });
+            return { ...license, activation_count: count };
+        }));
         
         res.json({
             success: true,
-            customer,
-            licenses: licenses || []
+            customer: {
+                id: customer._id,
+                email: customer.email,
+                name: customer.name,
+                created_at: customer.created_at,
+                last_login: customer.last_login
+            },
+            licenses: licensesWithCounts
         });
         
     } catch (error) {
@@ -169,10 +169,7 @@ router.put('/profile', verifyCustomerToken, async (req, res) => {
     try {
         const { name } = req.body;
         
-        await db.run(
-            'UPDATE customers SET name = ? WHERE id = ?',
-            [name, req.customerId]
-        );
+        await models.Customer.findByIdAndUpdate(req.customerId, { name });
         
         res.json({
             success: true,
@@ -191,10 +188,7 @@ router.put('/password', verifyCustomerToken, async (req, res) => {
         const { currentPassword, newPassword } = req.body;
         
         // Get customer
-        const customer = await db.get(
-            'SELECT password_hash FROM customers WHERE id = ?',
-            [req.customerId]
-        );
+        const customer = await models.Customer.findById(req.customerId);
         
         // Verify current password
         const validPassword = await bcrypt.compare(currentPassword, customer.password_hash);
@@ -206,10 +200,8 @@ router.put('/password', verifyCustomerToken, async (req, res) => {
         // Hash new password
         const newHash = await bcrypt.hash(newPassword, 10);
         
-        await db.run(
-            'UPDATE customers SET password_hash = ? WHERE id = ?',
-            [newHash, req.customerId]
-        );
+        customer.password_hash = newHash;
+        await customer.save();
         
         res.json({
             success: true,

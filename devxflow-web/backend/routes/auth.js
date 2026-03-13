@@ -13,12 +13,17 @@ router.post('/login', async (req, res) => {
 
         if (!username || !password) {
             return res.status(400).json({ 
-                error: 'Username and password are required' 
+                error: 'Username/email and password are required' 
             });
         }
 
-        // Get admin from database using Mongoose
-        const admin = await models.Admin.findOne({ username });
+        // Get admin from database - support both username and email
+        const admin = await models.Admin.findOne({ 
+            $or: [
+                { username: username },
+                { email: username }
+            ]
+        });
 
         if (!admin) {
             return res.status(401).json({ 
@@ -39,7 +44,8 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign(
             { 
                 adminId: admin._id, 
-                username: admin.username 
+                username: admin.username,
+                email: admin.email
             },
             JWT_SECRET,
             { expiresIn: '24h' }
@@ -50,7 +56,8 @@ router.post('/login', async (req, res) => {
             token,
             admin: {
                 id: admin._id,
-                username: admin.username
+                username: admin.username,
+                email: admin.email
             }
         });
 

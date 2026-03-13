@@ -13,6 +13,9 @@ const paymentRoutes = require('./routes/payment');
 const messageRoutes = require('./routes/messages');
 const trialRoutes = require('./routes/trials');
 const customerRoutes = require('./routes/customers');
+const aiConfigRoutes = require('./routes/aiConfig');
+const customerApiKeysRoutes = require('./routes/customerApiKeys');
+const customerLicenseRoutes = require('./routes/customerLicense');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,6 +40,9 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/trials', trialRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/admin/ai-config', aiConfigRoutes);
+app.use('/api/customer/api-keys', customerApiKeysRoutes);
+app.use('/api/customer/license', customerLicenseRoutes);
 
 // Admin dashboard route
 app.get('/admin', (req, res) => {

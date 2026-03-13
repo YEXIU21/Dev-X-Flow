@@ -4,6 +4,8 @@ interface LicenseModalProps {
   isOpen: boolean
   onClose: () => void
   onActivate: (licenseKey: string) => Promise<{ valid: boolean; tier?: string; expires_at?: string | null; features?: string[]; error?: string }>
+  onLogin?: () => Promise<{ success: boolean }>
+  onStartTrial?: () => Promise<{ success: boolean; trial?: { active: boolean; expires_at: string; days_remaining: number }; error?: string }>
   initialMode?: 'welcome' | 'input' | 'trial'
 }
 
@@ -27,13 +29,16 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
   isOpen,
   onClose,
   onActivate,
+  onLogin,
+  onStartTrial,
   initialMode = 'welcome'
 }) => {
-  const [mode, setMode] = useState<'welcome' | 'input' | 'trial' | 'status'>(initialMode)
+  const [mode, setMode] = useState<'welcome' | 'input' | 'trial' | 'status' | 'login'>(initialMode)
   const [licenseKey, setLicenseKey] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState<LicenseStatus | null>(null)
   const [error, setError] = useState('')
+  const [trialInfo, setTrialInfo] = useState<{ active: boolean; expires_at: string; days_remaining: number } | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -41,6 +46,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
       setLicenseKey('')
       setError('')
       setStatus(null)
+      setTrialInfo(null)
     }
   }, [isOpen, initialMode])
 
@@ -63,8 +69,42 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
     }
   }
 
-  const handleStartTrial = () => {
-    setMode('trial')
+  const handleStartTrial = async () => {
+    // If onStartTrial provided, call API; otherwise just show trial UI
+    if (onStartTrial) {
+      setIsLoading(true)
+      setError('')
+      try {
+        const result = await onStartTrial()
+        if (result.success && result.trial) {
+          setTrialInfo(result.trial)
+          setMode('trial')
+        } else {
+          setError(result.error || 'Failed to start trial')
+        }
+      } catch (err) {
+        setError('Failed to start trial')
+      } finally {
+        setIsLoading(false)
+      }
+    } else {
+      setMode('trial')
+    }
+  }
+
+  const handleLogin = async () => {
+    if (onLogin) {
+      setIsLoading(true)
+      try {
+        await onLogin()
+        // Login opens browser - show waiting state
+        setMode('login')
+      } catch (err) {
+        setError('Failed to open login')
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
   const handleBuyLicense = () => {
@@ -101,11 +141,24 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
               <button
                 className="license-btn license-btn-primary"
                 onClick={handleStartTrial}
+                disabled={isLoading}
               >
                 <span className="btn-icon">🚀</span>
                 <span className="btn-text">
                   <strong>Start Free Trial</strong>
                   <small>30 days, limited features</small>
+                </span>
+              </button>
+
+              <button
+                className="license-btn license-btn-secondary"
+                onClick={handleLogin}
+                disabled={isLoading}
+              >
+                <span className="btn-icon">🔐</span>
+                <span className="btn-text">
+                  <strong>Login to Account</strong>
+                  <small>Activate your license</small>
                 </span>
               </button>
 
@@ -132,6 +185,8 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
               </button>
             </div>
 
+            {error && <p className="license-error">{error}</p>}
+
             <div className="license-features-preview">
               <h4>Free Trial Includes:</h4>
               <ul>
@@ -144,6 +199,24 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
                 <li>❌ Merge resolver & rebase UI</li>
               </ul>
             </div>
+          </div>
+        )}
+
+        {mode === 'login' && (
+          <div className="license-login-waiting">
+            <h2>🔐 Logging in...</h2>
+            <p className="license-subtitle">
+              Complete login in your browser
+            </p>
+            <p className="login-hint">
+              The browser will redirect back to Dev-X-Flow after login.
+            </p>
+            <button
+              className="license-btn license-btn-outline"
+              onClick={() => setMode('welcome')}
+            >
+              Cancel
+            </button>
           </div>
         )}
 

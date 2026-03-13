@@ -1,241 +1,281 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { Navbar } from '../components/common/Navbar'
+import { useAuth } from '../contexts/AuthContext'
+import { GitBranch, FolderGit2, Rocket, RefreshCw, Plus, Sparkles, Bug, Clock, Activity as ActivityIcon, Settings, ExternalLink } from 'lucide-react'
+
+const API_BASE = 'http://localhost:5000/api'
 
 export function DashboardPage() {
+  const { customer, token } = useAuth()
   const [activeTab, setActiveTab] = useState('overview')
+  const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({
     totalCommits: 0,
     repositories: 0,
     activeProjects: 0,
-    lastSync: ''
+    lastSync: 'Never'
   })
 
+  const [recentActivity, setRecentActivity] = useState<Array<{
+    id: number
+    action: string
+    project: string
+    time: string
+    type: 'success' | 'info' | 'warning' | 'error'
+  }>>([])
+
+  const [projects, setProjects] = useState<Array<{
+    id: number
+    name: string
+    status: string
+    lastCommit: string
+    branches: number
+  }>>([])
+
   useEffect(() => {
-    // Simulate loading dashboard data
-    setStats({
-      totalCommits: 1247,
-      repositories: 8,
-      activeProjects: 3,
-      lastSync: '2 minutes ago'
-    })
-  }, [])
+    loadDashboardData()
+  }, [token])
 
-  const recentActivity = [
-    { id: 1, action: 'Commit pushed', project: 'devxflow-app', time: '5 min ago', type: 'success' },
-    { id: 2, action: 'Branch merged', project: 'mobile-app', time: '1 hour ago', type: 'info' },
-    { id: 3, action: 'Issue resolved', project: 'api-server', time: '3 hours ago', type: 'success' },
-    { id: 4, action: 'Pull request created', project: 'documentation', time: '5 hours ago', type: 'warning' }
-  ]
-
-  const projects = [
-    { id: 1, name: 'devxflow-app', status: 'active', lastCommit: '10 min ago', branches: 5 },
-    { id: 2, name: 'mobile-app', status: 'active', lastCommit: '2 hours ago', branches: 3 },
-    { id: 3, name: 'api-server', status: 'active', lastCommit: '1 day ago', branches: 8 },
-    { id: 4, name: 'documentation', status: 'inactive', lastCommit: '3 days ago', branches: 2 }
-  ]
+  const loadDashboardData = async () => {
+    if (!token) return
+    setIsLoading(true)
+    try {
+      // Load real data from backend
+      const res = await fetch(`${API_BASE}/customers/dashboard`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setStats(data.stats || stats)
+        setRecentActivity(data.activity || [])
+        setProjects(data.projects || [])
+      }
+    } catch (e) {
+      // Use placeholder data if API not available
+      setStats({
+        totalCommits: 0,
+        repositories: 0,
+        activeProjects: 0,
+        lastSync: 'Connect desktop app'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="dashboard-page">
-      <nav className="nav">
-        <div className="logo">Dev-X-Flow</div>
-        <div className="nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/pricing">Pricing</Link>
-          <Link to="/download">Download</Link>
-          <Link to="/contact">Contact</Link>
-          <Link to="/changelog">Changelog</Link>
-          <Link to="/logout">Logout</Link>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="dashboard-container">
         <div className="dashboard-header">
-          <h1>Dashboard</h1>
-          <p>Welcome back! Here's what's happening with your projects.</p>
+          <div className="header-content">
+            <h1>Welcome back, {customer?.name?.split(' ')[0] || 'User'}</h1>
+            <p>Here's what's happening with your development workflow.</p>
+          </div>
+          <Link to="/download" className="btn-primary btn-download">
+            <ExternalLink size={18} />
+            Open Desktop App
+          </Link>
         </div>
 
+        {/* Stats Grid */}
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-icon">📊</div>
+            <div className="stat-icon commits">
+              <GitBranch size={24} />
+            </div>
             <div className="stat-info">
-              <h3>{stats.totalCommits}</h3>
-              <p>Total Commits</p>
+              <span className="stat-value">{stats.totalCommits.toLocaleString()}</span>
+              <span className="stat-label">Total Commits</span>
             </div>
           </div>
           
           <div className="stat-card">
-            <div className="stat-icon">🗂️</div>
+            <div className="stat-icon repos">
+              <FolderGit2 size={24} />
+            </div>
             <div className="stat-info">
-              <h3>{stats.repositories}</h3>
-              <p>Repositories</p>
+              <span className="stat-value">{stats.repositories}</span>
+              <span className="stat-label">Repositories</span>
             </div>
           </div>
           
           <div className="stat-card">
-            <div className="stat-icon">🚀</div>
+            <div className="stat-icon projects">
+              <Rocket size={24} />
+            </div>
             <div className="stat-info">
-              <h3>{stats.activeProjects}</h3>
-              <p>Active Projects</p>
+              <span className="stat-value">{stats.activeProjects}</span>
+              <span className="stat-label">Active Projects</span>
             </div>
           </div>
           
           <div className="stat-card">
-            <div className="stat-icon">🔄</div>
+            <div className="stat-icon sync">
+              <RefreshCw size={24} />
+            </div>
             <div className="stat-info">
-              <h3>{stats.lastSync}</h3>
-              <p>Last Sync</p>
+              <span className="stat-value">{stats.lastSync}</span>
+              <span className="stat-label">Last Sync</span>
             </div>
           </div>
         </div>
 
-        <div className="tabs">
+        {/* Tabs */}
+        <div className="tabs-container">
           <button 
-            className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
+            className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
-            Overview
+            <ActivityIcon size={18} /> Overview
           </button>
           <button 
-            className={`tab ${activeTab === 'projects' ? 'active' : ''}`}
+            className={`tab-btn ${activeTab === 'projects' ? 'active' : ''}`}
             onClick={() => setActiveTab('projects')}
           >
-            Projects
+            <FolderGit2 size={18} /> Projects
           </button>
           <button 
-            className={`tab ${activeTab === 'activity' ? 'active' : ''}`}
+            className={`tab-btn ${activeTab === 'activity' ? 'active' : ''}`}
             onClick={() => setActiveTab('activity')}
           >
-            Activity
-          </button>
-          <button 
-            className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            Settings
+            <Clock size={18} /> Activity
           </button>
         </div>
 
+        {/* Tab Content */}
         <div className="tab-content">
           {activeTab === 'overview' && (
             <div className="overview-content">
-              <div className="content-section">
+              {/* Quick Actions */}
+              <section className="content-section">
                 <h2>Quick Actions</h2>
-                <div className="quick-actions">
-                  <button className="action-btn">
-                    <span className="action-icon">➕</span>
-                    <span>New Repository</span>
-                  </button>
-                  <button className="action-btn">
-                    <span className="action-icon">🔄</span>
-                    <span>Sync All</span>
-                  </button>
-                  <button className="action-btn">
-                    <span className="action-icon">📝</span>
-                    <span>AI Commit</span>
-                  </button>
-                  <button className="action-btn">
-                    <span className="action-icon">🐛</span>
-                    <span>Debug Mode</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="content-section">
-                <h2>Recent Activity</h2>
-                <div className="activity-list">
-                  {recentActivity.map(activity => (
-                    <div key={activity.id} className="activity-item">
-                      <div className={`activity-indicator ${activity.type}`}></div>
-                      <div className="activity-content">
-                        <p className="activity-action">{activity.action}</p>
-                        <p className="activity-project">{activity.project}</p>
-                      </div>
-                      <span className="activity-time">{activity.time}</span>
+                <div className="quick-actions-grid">
+                  <button className="action-card">
+                    <div className="action-icon"><Plus size={20} /></div>
+                    <div className="action-text">
+                      <span className="action-title">New Repository</span>
+                      <span className="action-desc">Clone or create a repo</span>
                     </div>
-                  ))}
+                  </button>
+                  <button className="action-card">
+                    <div className="action-icon"><RefreshCw size={20} /></div>
+                    <div className="action-text">
+                      <span className="action-title">Sync All</span>
+                      <span className="action-desc">Pull latest changes</span>
+                    </div>
+                  </button>
+                  <button className="action-card">
+                    <div className="action-icon"><Sparkles size={20} /></div>
+                    <div className="action-text">
+                      <span className="action-title">AI Commit</span>
+                      <span className="action-desc">Generate commit message</span>
+                    </div>
+                  </button>
+                  <button className="action-card">
+                    <div className="action-icon"><Bug size={20} /></div>
+                    <div className="action-text">
+                      <span className="action-title">Debug Mode</span>
+                      <span className="action-desc">Monitor application logs</span>
+                    </div>
+                  </button>
                 </div>
-              </div>
+              </section>
+
+              {/* Recent Activity */}
+              <section className="content-section">
+                <h2>Recent Activity</h2>
+                {isLoading ? (
+                  <div className="loading-state">Loading activity...</div>
+                ) : recentActivity.length === 0 ? (
+                  <div className="empty-state">
+                    <ActivityIcon size={48} />
+                    <p>No recent activity</p>
+                    <span>Connect the desktop app to start tracking</span>
+                  </div>
+                ) : (
+                  <div className="activity-list">
+                    {recentActivity.map(activity => (
+                      <div key={activity.id} className="activity-item">
+                        <div className={`activity-indicator ${activity.type}`}></div>
+                        <div className="activity-content">
+                          <span className="activity-action">{activity.action}</span>
+                          <span className="activity-project">{activity.project}</span>
+                        </div>
+                        <span className="activity-time">{activity.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           )}
 
           {activeTab === 'projects' && (
             <div className="projects-content">
-              <div className="content-header">
+              <div className="section-header">
                 <h2>Your Projects</h2>
                 <button className="btn-primary">New Project</button>
               </div>
               
-              <div className="projects-grid">
-                {projects.map(project => (
-                  <div key={project.id} className="project-card">
-                    <div className="project-header">
-                      <h3>{project.name}</h3>
-                      <span className={`status ${project.status}`}>{project.status}</span>
+              {isLoading ? (
+                <div className="loading-state">Loading projects...</div>
+              ) : projects.length === 0 ? (
+                <div className="empty-state">
+                  <FolderGit2 size={48} />
+                  <p>No projects yet</p>
+                  <span>Open the desktop app to add repositories</span>
+                </div>
+              ) : (
+                <div className="projects-grid">
+                  {projects.map(project => (
+                    <div key={project.id} className="project-card">
+                      <div className="project-header">
+                        <h3>{project.name}</h3>
+                        <span className={`status-badge ${project.status}`}>{project.status}</span>
+                      </div>
+                      <div className="project-meta">
+                        <span><Clock size={14} /> {project.lastCommit}</span>
+                        <span><GitBranch size={14} /> {project.branches} branches</span>
+                      </div>
+                      <div className="project-actions">
+                        <button className="btn-ghost">Open</button>
+                        <button className="btn-ghost">Sync</button>
+                        <Link to="/settings" className="btn-ghost">
+                          <Settings size={14} />
+                        </Link>
+                      </div>
                     </div>
-                    <div className="project-info">
-                      <p>Last commit: {project.lastCommit}</p>
-                      <p>Branches: {project.branches}</p>
-                    </div>
-                    <div className="project-actions">
-                      <button className="btn-small">Open</button>
-                      <button className="btn-small">Sync</button>
-                      <button className="btn-small">Settings</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === 'activity' && (
             <div className="activity-content">
               <h2>Full Activity Log</h2>
-              <div className="activity-log">
-                {recentActivity.concat(recentActivity).map((activity, index) => (
-                  <div key={index} className="log-item">
-                    <span className="log-time">{activity.time}</span>
-                    <span className="log-action">{activity.action}</span>
-                    <span className="log-project">{activity.project}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'settings' && (
-            <div className="settings-content">
-              <h2>Settings</h2>
-              <div className="settings-form">
-                <div className="form-group">
-                  <label htmlFor="ai-provider">Default AI Provider</label>
-                  <select id="ai-provider" aria-label="Default AI Provider">
-                    <option>OpenAI GPT-4</option>
-                    <option>Claude 3.5</option>
-                    <option>Gemini Pro</option>
-                  </select>
+              {isLoading ? (
+                <div className="loading-state">Loading activity log...</div>
+              ) : recentActivity.length === 0 ? (
+                <div className="empty-state">
+                  <Clock size={48} />
+                  <p>No activity recorded</p>
+                  <span>Activity will appear here when you use the desktop app</span>
                 </div>
-                
-                <div className="form-group">
-                  <label htmlFor="sync-frequency">Sync Frequency</label>
-                  <select id="sync-frequency" aria-label="Sync Frequency">
-                    <option>Every 5 minutes</option>
-                    <option>Every 15 minutes</option>
-                    <option>Every hour</option>
-                    <option>Manual only</option>
-                  </select>
+              ) : (
+                <div className="activity-log">
+                  {recentActivity.map((activity, index) => (
+                    <div key={index} className="log-item">
+                      <span className="log-time">{activity.time}</span>
+                      <span className={`log-type ${activity.type}`}>{activity.action}</span>
+                      <span className="log-project">{activity.project}</span>
+                    </div>
+                  ))}
                 </div>
-                
-                <div className="form-group">
-                  <label htmlFor="theme">Theme</label>
-                  <select id="theme" aria-label="Theme">
-                    <option>Dark</option>
-                    <option>Light</option>
-                    <option>Auto</option>
-                  </select>
-                </div>
-                
-                <button className="btn-primary">Save Settings</button>
-              </div>
+              )}
             </div>
           )}
         </div>

@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-export function LoginPage() {
+export function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -14,12 +14,12 @@ export function LoginPage() {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:5000/api/customers/login', {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username: email, password }),
       })
 
       const data = await response.json()
@@ -29,14 +29,14 @@ export function LoginPage() {
       }
 
       // Store token and redirect
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('customer', JSON.stringify(data.customer))
+      localStorage.setItem('adminToken', data.token)
+      localStorage.setItem('admin', JSON.stringify(data.admin))
       
-      console.log('Login successful:', data)
-      navigate('/dashboard')
+      console.log('Admin login successful:', data)
+      navigate('/admin')
       
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password')
+      setError(err.message || 'Invalid credentials')
     } finally {
       setIsLoading(false)
     }
@@ -46,8 +46,8 @@ export function LoginPage() {
     <div className="login-page">
       <div className="login-container">
         <div className="header">
-          <h1>Welcome Back</h1>
-          <p>Sign in to your customer account</p>
+          <h1>Admin Login</h1>
+          <p>Sign in to access admin panel</p>
         </div>
         
         {error && (
@@ -58,13 +58,13 @@ export function LoginPage() {
         
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="email">Email</label>
             <input
               type="email"
               id="email"
               name="email"
               required
-              placeholder="you@example.com"
+              placeholder="admin@gmail.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -95,12 +95,6 @@ export function LoginPage() {
           </div>
         )}
         
-        <div className="links">
-          <Link to="/register">Create Account</Link>
-          <span>|</span>
-          <Link to="/contact">Forgot Password?</Link>
-        </div>
-        
         <div className="back-link">
           <Link to="/">← Back to Home</Link>
         </div>
@@ -129,7 +123,7 @@ export function LoginPage() {
           background: var(--bg-secondary);
           padding: 50px;
           border-radius: 16px;
-          border: 1px solid rgba(0, 212, 255, 0.2);
+          border: 1px solid rgba(139, 92, 246, 0.3);
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
         
@@ -141,7 +135,7 @@ export function LoginPage() {
         .header h1 {
           font-size: 28px;
           margin-bottom: 10px;
-          color: var(--accent);
+          color: #8b5cf6;
         }
         
         .header p {
@@ -164,7 +158,7 @@ export function LoginPage() {
           width: 100%;
           padding: 15px;
           background: rgba(0, 0, 0, 0.3);
-          border: 1px solid rgba(0, 212, 255, 0.2);
+          border: 1px solid rgba(139, 92, 246, 0.2);
           border-radius: 8px;
           color: var(--text-primary);
           font-family: inherit;
@@ -174,8 +168,8 @@ export function LoginPage() {
         
         .form-group input:focus {
           outline: none;
-          border-color: var(--accent);
-          box-shadow: 0 0 10px var(--accent-glow);
+          border-color: #8b5cf6;
+          box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
         }
         
         .form-group input::placeholder {
@@ -186,8 +180,8 @@ export function LoginPage() {
         .btn {
           width: 100%;
           padding: 18px;
-          background: var(--accent);
-          color: var(--bg-primary);
+          background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+          color: white;
           border: none;
           border-radius: 8px;
           font-size: 16px;
@@ -199,7 +193,7 @@ export function LoginPage() {
         
         .btn:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 10px 30px var(--accent-glow);
+          box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
         }
         
         .btn:disabled {
@@ -207,27 +201,6 @@ export function LoginPage() {
           cursor: not-allowed;
           transform: none;
           box-shadow: none;
-        }
-        
-        .links {
-          text-align: center;
-          margin-top: 25px;
-          font-size: 14px;
-        }
-        
-        .links a {
-          color: var(--accent);
-          text-decoration: none;
-          transition: opacity 0.3s;
-        }
-        
-        .links a:hover {
-          opacity: 0.8;
-        }
-        
-        .links span {
-          color: var(--text-secondary);
-          margin: 0 10px;
         }
         
         .back-link {
@@ -242,7 +215,7 @@ export function LoginPage() {
         }
         
         .back-link a:hover {
-          color: var(--accent);
+          color: #8b5cf6;
         }
         
         .error-message {
@@ -265,7 +238,7 @@ export function LoginPage() {
           width: 20px;
           height: 20px;
           border: 2px solid var(--text-secondary);
-          border-top: 2px solid var(--accent);
+          border-top: 2px solid #8b5cf6;
           border-radius: 50%;
           animation: spin 1s linear infinite;
           margin: 0 auto 10px;

@@ -1,23 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Navbar } from '../components/common/Navbar'
 
 export function PaymentPage() {
   const [selectedPlan, setSelectedPlan] = useState('professional')
+  const [qrUrl, setQrUrl] = useState('')
+  const [gcashNumber, setGcashNumber] = useState('')
   const [formData, setFormData] = useState({
+    name: '',
     email: '',
-    cardName: '',
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    billingAddress: ''
+    gcashRef: ''
   })
+  const [screenshot, setScreenshot] = useState<File | null>(null)
+  const [screenshotPreview, setScreenshotPreview] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [paymentId, setPaymentId] = useState('')
+  const [error, setError] = useState('')
 
   const plans = [
     {
       id: 'basic',
       name: '1 Year',
       price: '₱399',
+      amount: 399,
       description: 'Annual license',
       features: [
         'All features included',
@@ -31,6 +36,7 @@ export function PaymentPage() {
       id: 'professional',
       name: '3 Years',
       price: '₱899',
+      amount: 899,
       description: 'Save 25% over 1-year plan',
       featured: true,
       features: [
@@ -56,6 +62,23 @@ export function PaymentPage() {
     }
   ]
 
+  // Fetch QR code on mount
+  useEffect(() => {
+    const fetchQR = async () => {
+      try {
+        const res = await fetch('/api/payment/qr')
+        const data = await res.json()
+        if (data.success) {
+          setQrUrl(data.qr_url)
+          setGcashNumber(data.gcash_number)
+        }
+      } catch (err) {
+        console.error('Failed to fetch QR:', err)
+      }
+    }
+    fetchQR()
+  }, [])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -63,24 +86,70 @@ export function PaymentPage() {
     })
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File size must be less than 5MB')
+        return
+      }
+      setScreenshot(file)
+      setScreenshotPreview(URL.createObjectURL(file))
+      setError('')
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setError('')
     
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsSubmitted(true)
+    if (!screenshot) {
+      setError('Please upload a payment screenshot')
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const submitData = new FormData()
+      submitData.append('name', formData.name)
+      submitData.append('email', formData.email)
+      submitData.append('plan', selectedPlan)
+      submitData.append('gcash_ref', formData.gcashRef)
+      submitData.append('screenshot', screenshot)
+
+      const res = await fetch('/api/payment/submit-proof', {
+        method: 'POST',
+        body: submitData
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setPaymentId(data.payment_id)
+        setIsSubmitted(true)
+      } else {
+        setError(data.error || 'Payment submission failed')
+      }
+    } catch (err) {
+      setError('Failed to submit payment. Please try again.')
+    } finally {
       setIsLoading(false)
-    }, 3000)
+    }
   }
 
   if (isSubmitted) {
     return (
       <div className="payment-page">
-        <div className="success-container">
-          <div className="success-icon">✓</div>
-          <h1>Payment Successful!</h1>
-          <p>Thank you for purchasing Dev-X-Flow. Your license key has been sent to your email.</p>
+        <Navbar />
+        <div className="payment-container">
+          <div className="success-container">
+            <div className="success-icon">✓</div>
+            <h1>Payment Submitted!</h1>
+            <p>Thank you for your payment. We will verify your transaction and send your license key within 24 hours.</p>
+            <p className="payment-id">Payment ID: {paymentId}</p>
+            <p className="note">You will receive your license key via email at <strong>{formData.email}</strong></p>
+          </div>
         </div>
       </div>
     )
@@ -88,15 +157,17 @@ export function PaymentPage() {
 
   return (
     <div className="payment-page">
+      <Navbar />
       <div className="payment-container">
         <div className="payment-header">
           <h1>Complete Your Purchase</h1>
-          <p>Choose your plan and secure your DevXFlow license</p>
+          <p>Pay via GCash and get your DevXFlow license</p>
         </div>
         
         <div className="payment-content">
+          {/* Plan Selection */}
           <div className="plan-selection">
-            <h1>Get DevXFlow</h1>
+            <h2>Choose Your Plan</h2>
             <div className="plans-grid">
               {plans.map(plan => (
                 <div 
@@ -113,116 +184,121 @@ export function PaymentPage() {
                       <li key={index}>{feature}</li>
                     ))}
                   </ul>
-                  <button className="btn-select">
+                  <button type="button" className="btn-select">
                     {selectedPlan === plan.id ? '✓ Selected' : 'Select'}
                   </button>
                 </div>
               ))}
             </div>
           </div>
-          
+
           {selectedPlan !== 'enterprise' && (
             <div className="payment-form-container">
-              <h2>Payment Information</h2>
+              {/* QR Code Section */}
+              <div className="qr-section">
+                <h2>Scan to Pay via GCash</h2>
+                <div className="qr-code">
+                  {qrUrl ? (
+                    <img src={qrUrl} alt="GCash QR Code" />
+                  ) : (
+                    <div className="qr-placeholder">Loading QR...</div>
+                  )}
+                </div>
+                <p className="gcash-number">GCash: {gcashNumber}</p>
+                <p className="amount-to-pay">
+                  Amount to send: <strong>{plans.find(p => p.id === selectedPlan)?.price}</strong>
+                </p>
+              </div>
+
+              {/* Payment Form */}
               <form className="payment-form" onSubmit={handleSubmit}>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="email">Email Address</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
+                <h2>Submit Payment Proof</h2>
                 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="cardName">Name on Card</label>
-                    <input
-                      type="text"
-                      id="cardName"
-                      name="cardName"
-                      value={formData.cardName}
-                      onChange={handleChange}
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
+                {error && <div className="error-message">{error}</div>}
+
+                <div className="form-group">
+                  <label htmlFor="name">Full Name</label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Juan Dela Cruz"
+                    required
+                    disabled={isLoading}
+                  />
                 </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="cardNumber">Card Number</label>
-                    <input
-                      type="text"
-                      id="cardNumber"
-                      name="cardNumber"
-                      placeholder="1234 5678 9012 3456"
-                      value={formData.cardNumber}
-                      onChange={handleChange}
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
+
+                <div className="form-group">
+                  <label htmlFor="email">Email Address</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="you@example.com"
+                    required
+                    disabled={isLoading}
+                  />
+                  <span className="hint">License key will be sent to this email</span>
                 </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="expiryDate">Expiry Date</label>
-                    <input
-                      type="text"
-                      id="expiryDate"
-                      name="expiryDate"
-                      placeholder="MM/YY"
-                      value={formData.expiryDate}
-                      onChange={handleChange}
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="cvv">CVV</label>
-                    <input
-                      type="text"
-                      id="cvv"
-                      name="cvv"
-                      placeholder="123"
-                      value={formData.cvv}
-                      onChange={handleChange}
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
+
+                <div className="form-group">
+                  <label htmlFor="gcashRef">GCash Reference Number</label>
+                  <input
+                    type="text"
+                    id="gcashRef"
+                    name="gcashRef"
+                    value={formData.gcashRef}
+                    onChange={handleChange}
+                    placeholder="e.g., 1234567890"
+                    required
+                    disabled={isLoading}
+                  />
+                  <span className="hint">Found in your GCash transaction history</span>
                 </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="billingAddress">Billing Address</label>
+
+                <div className="form-group">
+                  <label htmlFor="screenshot">Payment Screenshot</label>
+                  <div className="file-upload">
                     <input
-                      type="text"
-                      id="billingAddress"
-                      name="billingAddress"
-                      value={formData.billingAddress}
-                      onChange={handleChange}
+                      type="file"
+                      id="screenshot"
+                      name="screenshot"
+                      accept="image/*"
+                      onChange={handleFileChange}
                       required
                       disabled={isLoading}
                     />
+                    <div className="file-label">
+                      {screenshot ? screenshot.name : 'Choose file or drag here'}
+                    </div>
                   </div>
+                  {screenshotPreview && (
+                    <div className="screenshot-preview">
+                      <img src={screenshotPreview} alt="Payment proof preview" />
+                    </div>
+                  )}
                 </div>
-                
+
                 <button type="submit" className="btn-pay" disabled={isLoading}>
-                  {isLoading ? 'Processing...' : `Pay ${plans.find(p => p.id === selectedPlan)?.price}`}
+                  {isLoading ? 'Submitting...' : 'Submit Payment'}
                 </button>
-                
+
                 <p className="secure-payment">
-                  🔒 Secure payments powered by PayMongo. 30-day money-back guarantee.
+                  🔒 Your payment will be verified within 24 hours. License key sent via email.
                 </p>
               </form>
+            </div>
+          )}
+
+          {selectedPlan === 'enterprise' && (
+            <div className="enterprise-contact">
+              <h2>Enterprise Pricing</h2>
+              <p>Contact us for custom enterprise pricing tailored to your team's needs.</p>
+              <a href="/contact" className="btn-contact">Contact Sales</a>
             </div>
           )}
         </div>
