@@ -84,14 +84,15 @@ export function DownloadPage() {
           padding: 120px 20px;
           display: flex;
           justify-content: center;
-          align-items: center;
+          align-items: flex-start;
+          min-height: 100vh;
         }
 
         .download-card {
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(0, 212, 255, 0.1);
           border-radius: 20px;
-          padding: 60px;
+          padding: 40px 30px;
           max-width: 600px;
           width: 100%;
           text-align: center;
@@ -99,26 +100,27 @@ export function DownloadPage() {
         }
 
         .icon {
-          font-size: 64px;
-          margin-bottom: 20px;
+          font-size: 48px;
+          margin-bottom: 16px;
         }
 
         h1 {
-          font-size: 36px;
+          font-size: 28px;
           color: #00d4ff;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
 
         .version {
           color: rgba(255, 255, 255, 0.5);
           font-size: 14px;
-          margin-bottom: 30px;
+          margin-bottom: 24px;
         }
 
         .description {
           color: rgba(255, 255, 255, 0.8);
           line-height: 1.6;
-          margin-bottom: 40px;
+          margin-bottom: 32px;
+          font-size: 15px;
         }
 
         .download-button {
@@ -128,12 +130,12 @@ export function DownloadPage() {
           background: #00d4ff;
           color: #0a0a0f;
           text-decoration: none;
-          padding: 20px 40px;
+          padding: 16px 32px;
           border-radius: 12px;
           font-weight: 700;
-          font-size: 18px;
+          font-size: 16px;
           transition: all 0.3s;
-          margin-bottom: 40px;
+          margin-bottom: 32px;
         }
 
         .download-button:hover {
@@ -150,13 +152,13 @@ export function DownloadPage() {
         .requirements {
           text-align: left;
           border-top: 1px solid rgba(255, 255, 255, 0.1);
-          padding-top: 30px;
+          padding-top: 24px;
         }
 
         .requirements h3 {
-          font-size: 16px;
+          font-size: 15px;
           color: #00d4ff;
-          margin-bottom: 15px;
+          margin-bottom: 12px;
         }
 
         ul {
@@ -166,8 +168,8 @@ export function DownloadPage() {
 
         li {
           color: rgba(255, 255, 255, 0.6);
-          font-size: 14px;
-          margin-bottom: 8px;
+          font-size: 13px;
+          margin-bottom: 6px;
           display: flex;
           align-items: center;
           gap: 10px;
@@ -176,6 +178,29 @@ export function DownloadPage() {
         li::before {
           content: '•';
           color: #00d4ff;
+        }
+
+        @media (max-width: 480px) {
+          .download-container {
+            padding: 100px 16px 40px;
+          }
+          
+          .download-card {
+            padding: 30px 20px;
+          }
+          
+          h1 {
+            font-size: 24px;
+          }
+          
+          .icon {
+            font-size: 40px;
+          }
+          
+          .download-button {
+            padding: 14px 24px;
+            font-size: 15px;
+          }
         }
       `}</style>
     </div>

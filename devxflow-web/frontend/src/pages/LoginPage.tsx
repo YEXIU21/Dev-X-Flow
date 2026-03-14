@@ -112,35 +112,33 @@ export function LoginPage() {
           background: #0a0a0f;
           color: var(--text-primary);
           min-height: 100vh;
-          width: 100vw;
+          width: 100%;
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: center;
-          padding: 80px 40px;
-          position: fixed;
-          top: 0;
-          left: 0;
-          z-index: 1;
+          padding: 100px 20px 40px;
+          overflow-y: auto;
         }
         
         .login-container {
           max-width: 450px;
           width: 100%;
           background: var(--bg-secondary);
-          padding: 50px;
+          padding: 40px 30px;
           border-radius: 16px;
           border: 1px solid rgba(0, 212, 255, 0.2);
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          margin-bottom: 20px;
         }
         
         .header {
           text-align: center;
-          margin-bottom: 40px;
+          margin-bottom: 30px;
         }
         
         .header h1 {
-          font-size: 28px;
-          margin-bottom: 10px;
+          font-size: 24px;
+          margin-bottom: 8px;
           color: var(--accent);
         }
         
@@ -150,19 +148,19 @@ export function LoginPage() {
         }
         
         .form-group {
-          margin-bottom: 25px;
+          margin-bottom: 20px;
         }
         
         .form-group label {
           display: block;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
           font-size: 14px;
           color: var(--text-secondary);
         }
         
         .form-group input {
           width: 100%;
-          padding: 15px;
+          padding: 14px;
           background: rgba(0, 0, 0, 0.3);
           border: 1px solid rgba(0, 212, 255, 0.2);
           border-radius: 8px;
@@ -170,6 +168,7 @@ export function LoginPage() {
           font-family: inherit;
           font-size: 14px;
           transition: all 0.3s;
+          box-sizing: border-box;
         }
         
         .form-group input:focus {
@@ -185,16 +184,17 @@ export function LoginPage() {
         
         .btn {
           width: 100%;
-          padding: 18px;
+          padding: 16px;
           background: var(--accent);
           color: var(--bg-primary);
           border: none;
           border-radius: 8px;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.3s;
           font-family: inherit;
+          box-sizing: border-box;
         }
         
         .btn:hover:not(:disabled) {
@@ -211,8 +211,8 @@ export function LoginPage() {
         
         .links {
           text-align: center;
-          margin-top: 25px;
-          font-size: 14px;
+          margin-top: 20px;
+          font-size: 13px;
         }
         
         .links a {
@@ -227,18 +227,19 @@ export function LoginPage() {
         
         .links span {
           color: var(--text-secondary);
-          margin: 0 10px;
+          margin: 0 8px;
         }
         
         .back-link {
           text-align: center;
-          margin-top: 20px;
+          margin-top: 16px;
         }
         
         .back-link a {
           color: var(--text-secondary);
           text-decoration: none;
           transition: color 0.3s;
+          font-size: 13px;
         }
         
         .back-link a:hover {
@@ -249,31 +250,76 @@ export function LoginPage() {
           background: rgba(255, 95, 86, 0.1);
           border: 1px solid var(--error);
           color: var(--error);
-          padding: 12px;
+          padding: 10px;
           border-radius: 8px;
-          margin-bottom: 20px;
-          font-size: 14px;
+          margin-bottom: 16px;
+          font-size: 13px;
         }
         
         .loading {
           text-align: center;
-          margin-top: 20px;
+          margin-top: 16px;
           color: var(--text-secondary);
+          font-size: 13px;
         }
         
         .spinner {
-          width: 20px;
-          height: 20px;
+          width: 18px;
+          height: 18px;
           border: 2px solid var(--text-secondary);
           border-top: 2px solid var(--accent);
           border-radius: 50%;
           animation: spin 1s linear infinite;
-          margin: 0 auto 10px;
+          margin: 0 auto 8px;
         }
         
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 480px) {
+          .login-page {
+            padding: 80px 16px 32px;
+          }
+          
+          .login-container {
+            padding: 30px 20px;
+          }
+          
+          .header h1 {
+            font-size: 22px;
+          }
+          
+          .form-group {
+            margin-bottom: 16px;
+          }
+          
+          .form-group input {
+            padding: 12px;
+          }
+          
+          .btn {
+            padding: 14px;
+          }
+        }
+        
+        @media (max-height: 600px) {
+          .login-page {
+            padding-top: 60px;
+          }
+          
+          .login-container {
+            padding: 24px 20px;
+          }
+          
+          .header {
+            margin-bottom: 20px;
+          }
+          
+          .form-group {
+            margin-bottom: 14px;
+          }
         }
       `}</style>
     </div>

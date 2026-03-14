@@ -2847,6 +2847,183 @@ body {
   color: var(--accent);
 }
 
+/* Payment Page Mobile Responsive */
+@media (max-width: 768px) {
+  .payment-container {
+    padding: 100px 16px 40px;
+  }
+  
+  .payment-header h1 {
+    font-size: 32px;
+  }
+  
+  .payment-header p {
+    font-size: 16px;
+  }
+  
+  .payment-content {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  
+  .payment-two-column {
+    flex-direction: column;
+    gap: 40px;
+  }
+  
+  .payment-form-container {
+    padding: 24px 20px;
+  }
+  
+  .plan-card {
+    padding: 20px;
+  }
+  
+  .price {
+    font-size: 28px;
+  }
+  
+  .qr-section {
+    padding: 20px;
+  }
+  
+  .qr-code img {
+    max-width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .payment-header h1 {
+    font-size: 26px;
+  }
+  
+  .payment-form-container {
+    padding: 20px 16px;
+  }
+  
+  .payment-form .form-group input {
+    padding: 12px;
+  }
+  
+  .btn-pay {
+    padding: 14px;
+    font-size: 15px;
+  }
+}
+
+/* Contact Page Mobile Responsive */
+@media (max-width: 768px) {
+  .contact-container {
+    padding: 100px 16px 40px;
+  }
+  
+  .contact-header h1 {
+    font-size: 32px;
+  }
+  
+  .contact-content {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  
+  .contact-form-container {
+    padding: 24px 20px;
+  }
+  
+  .info-card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-header h1 {
+    font-size: 26px;
+  }
+  
+  .contact-form-container {
+    padding: 20px 16px;
+  }
+}
+
+/* Dashboard Page Mobile Responsive */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 100px 16px 40px;
+  }
+  
+  .dashboard-header h1 {
+    font-size: 28px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .tab-content {
+    padding: 20px;
+  }
+  
+  .stat-card {
+    padding: 20px;
+  }
+  
+  .stat-icon {
+    width: 50px;
+    height: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-header h1 {
+    font-size: 24px;
+  }
+  
+  .tabs-container {
+    flex-wrap: wrap;
+  }
+  
+  .tab-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+/* Compare Page Mobile Responsive */
+@media (max-width: 480px) {
+  .compare-page {
+    padding: 100px 12px 40px;
+  }
+  
+  .compare-header h1 {
+    font-size: 26px;
+  }
+  
+  .compare-table th,
+  .compare-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+/* Changelog Page Mobile Responsive */
+@media (max-width: 768px) {
+  .changelog-page .container {
+    padding: 100px 16px 40px;
+  }
+  
+  .changelog-page .header h1 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .changelog-page .header h1 {
+    font-size: 24px;
+  }
+}
+
 /* Enterprise Contact */
 .enterprise-contact {
   text-align: center;

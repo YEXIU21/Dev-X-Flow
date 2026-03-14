@@ -29,7 +29,7 @@ export function CodeShowcaseSection() {
     []
   )
 
-  const [activeTab, setActiveTab] = useState<AppPreviewTab>('Rebase')
+  const [activeTab, setActiveTab] = useState<AppPreviewTab>('Status & Commit')
   const [repoPath, setRepoPath] = useState('D:\\projects\\devxflow\\repo')
   const [output, setOutput] = useState(
     'Select a tab to preview the module UI. This is a visual demo (no backend wiring).'

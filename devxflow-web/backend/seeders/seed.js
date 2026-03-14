@@ -1,3 +1,27 @@
+/**
+ * DEVXFLOW DATABASE SEEDER
+ * =======================
+ * 
+ * SEEDED USER ACCOUNTS:
+ * ---------------------
+ * 
+ * 1. ADMIN ACCOUNT
+ *    - Role: Full system administrator
+ *    - Access: Admin panel, license management, payment verification, system settings
+ *    - Email: admin@gmail.com
+ *    - Password: admin123
+ *    - Permissions: Create/Revoke licenses, View all customers, Manage payments, System config
+ * 
+ * 2. CUSTOMER ACCOUNT
+ *    - Role: Registered customer/user
+ *    - Access: Customer dashboard, license activation, profile settings
+ *    - Email: customer@test.com
+ *    - Password: customer123
+ *    - Permissions: View own license, Activate devices, Update profile, Contact support
+ * 
+ * =======================
+ */
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
