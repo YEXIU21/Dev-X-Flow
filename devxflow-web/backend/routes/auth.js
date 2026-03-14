@@ -4,7 +4,13 @@ const jwt = require('jsonwebtoken');
 const { models } = require('../database');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'devxflow-secret-key-change-in-production';
+
+// JWT Secret - REQUIRED in production
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('❌ FATAL: JWT_SECRET environment variable is required');
+    process.exit(1);
+}
 
 // Admin login
 router.post('/login', async (req, res) => {

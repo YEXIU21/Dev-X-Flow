@@ -9,9 +9,18 @@ async function setupUsers() {
         await mongoose.connect(process.env.MONGODB_URI);
         console.log('✅ Connected successfully');
 
+        // ⚠️ SECURITY WARNING ⚠️
+        // These default passwords are for INITIAL SETUP ONLY.
+        // CHANGE IMMEDIATELY after first login in production!
+        // Or set via environment variables: ADMIN_PASSWORD, USER_PASSWORD
+        
         // 1. Create Admin Account
         const adminUsername = 'devXflow_admin';
-        const adminPassword = 'admin_password_2026'; // Change this in production
+        const adminPassword = process.env.ADMIN_PASSWORD || 'admin_password_2026'; // ⚠️ CHANGE IN PRODUCTION
+        
+        if (!process.env.ADMIN_PASSWORD) {
+            console.log('⚠️  WARNING: Using default admin password. Set ADMIN_PASSWORD env var for production!');
+        }
         
         let admin = await models.Admin.findOne({ username: adminUsername });
         if (!admin) {
@@ -28,7 +37,11 @@ async function setupUsers() {
 
         // 2. Create Standard User Account
         const userEmail = 'user@devxflow.com';
-        const userPassword = 'user_password_2026'; // Change this in production
+        const userPassword = process.env.USER_PASSWORD || 'user_password_2026'; // ⚠️ CHANGE IN PRODUCTION
+        
+        if (!process.env.USER_PASSWORD) {
+            console.log('⚠️  WARNING: Using default user password. Set USER_PASSWORD env var for production!');
+        }
         
         let customer = await models.Customer.findOne({ email: userEmail });
         if (!customer) {

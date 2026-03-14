@@ -4,12 +4,18 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'devxflow-secret-key-change-in-production';
 
-// EmailJS configuration
-const EMAILJS_SERVICE_ID = 'service_uancg1j';
-const EMAILJS_TEMPLATE_ID = 'template_9qsanyf';
-const EMAILJS_PUBLIC_KEY = 'prslQVSP7JtsOzycN';
+// JWT Secret - REQUIRED in production
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('❌ FATAL: JWT_SECRET environment variable is required');
+    process.exit(1);
+}
+
+// EmailJS configuration - moved to environment variables
+const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID;
+const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY;
 
 // Send invitation email via EmailJS REST API
 async function sendInvitationEmail(toEmail, adminName, seats) {

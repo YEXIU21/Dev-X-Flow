@@ -4,8 +4,12 @@ const { models } = require('../database');
 
 const router = express.Router();
 
-// API key for desktop app (simple authentication)
-const DESKTOP_API_KEY = process.env.DESKTOP_API_KEY || 'devxflow-desktop-key';
+// API key for desktop app - REQUIRED in production
+const DESKTOP_API_KEY = process.env.DESKTOP_API_KEY;
+if (!DESKTOP_API_KEY) {
+    console.error('❌ FATAL: DESKTOP_API_KEY environment variable is required');
+    process.exit(1);
+}
 
 // Middleware to verify desktop app API key
 const verifyApiKey = (req, res, next) => {
