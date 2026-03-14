@@ -344,8 +344,9 @@ export function PaymentPage() {
                       id="gcashRef"
                       name="gcashRef"
                       value={formData.gcashRef}
-                      onChange={handleChange}
-                      placeholder="e.g., 1234567890"
+                      onChange={(e) => setFormData({ ...formData, gcashRef: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                      placeholder="13-digit reference"
+                      maxLength={13}
                       required
                       disabled={isLoading}
                     />
@@ -452,8 +453,9 @@ export function PaymentPage() {
                     id="gcashRef"
                     name="gcashRef"
                     value={formData.gcashRef}
-                    onChange={handleChange}
-                    placeholder="e.g., 1234567890"
+                    onChange={(e) => setFormData({ ...formData, gcashRef: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                    placeholder="13-digit reference"
+                    maxLength={13}
                     required
                     disabled={isLoading}
                   />

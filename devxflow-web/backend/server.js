@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const { connectDB } = require('./database');
@@ -18,8 +20,24 @@ const customerApiKeysRoutes = require('./routes/customerApiKeys');
 const customerLicenseRoutes = require('./routes/customerLicense');
 const enterpriseRoutes = require('./routes/enterprise');
 
+// Import socket handlers
+const { initChatHandlers } = require('./socket/chat');
+
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: ['http://localhost:3000', 'http://localhost:5000', 'http://127.0.0.1:3000'],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Initialize chat handlers
+initChatHandlers(io);
 
 // Connect to MongoDB
 connectDB();
@@ -46,9 +64,13 @@ app.use('/api/customer/api-keys', customerApiKeysRoutes);
 app.use('/api/customer/license', customerLicenseRoutes);
 app.use('/api/enterprise', enterpriseRoutes);
 
-// Admin dashboard route
+// Admin dashboard route - redirect to frontend dev server in development
 app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'frontend', 'admin', 'index.html'));
+    if (process.env.NODE_ENV === 'production') {
+        res.sendFile(path.join(__dirname, '..', 'frontend', 'build', 'index.html'));
+    } else {
+        res.redirect('http://localhost:5173/admin');
+    }
 });
 
 // Health check endpoint
@@ -66,10 +88,11 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Dev-X-Flow Licensing Server`);
     console.log(`================================`);
     console.log(`Server running on port ${PORT}`);
+    console.log(`Socket.io enabled for real-time chat`);
     console.log(`API endpoints:`);
     console.log(`  - POST /api/auth/login (Admin login)`);
     console.log(`  - POST /api/validate (License validation)`);

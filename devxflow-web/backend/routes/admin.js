@@ -92,19 +92,26 @@ router.get('/search', async (req, res) => {
     try {
         const { q } = req.query;
         
-        if (!q) {
-            return res.status(400).json({ error: 'Search query required' });
+        // If no query, return all licenses
+        const searchQuery = q && q.trim() ? q.trim() : null;
+        
+        let licenses;
+        if (searchQuery) {
+            // Search using MongoDB regex
+            licenses = await models.License.find({
+                $or: [
+                    { license_key: { $regex: searchQuery, $options: 'i' } },
+                    { customer_email: { $regex: searchQuery, $options: 'i' } }
+                ]
+            })
+            .sort({ created_at: -1 })
+            .lean();
+        } else {
+            // Return all licenses when no search query
+            licenses = await models.License.find()
+                .sort({ created_at: -1 })
+                .lean();
         }
-
-        // Search using MongoDB regex
-        const licenses = await models.License.find({
-            $or: [
-                { license_key: { $regex: q, $options: 'i' } },
-                { customer_email: { $regex: q, $options: 'i' } }
-            ]
-        })
-        .sort({ created_at: -1 })
-        .lean();
 
         // Get activation counts for each license
         const licensesWithCounts = await Promise.all(licenses.map(async (license) => {

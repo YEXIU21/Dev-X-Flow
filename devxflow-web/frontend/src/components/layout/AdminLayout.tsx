@@ -1,6 +1,6 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Key, CreditCard, MessageSquare, Settings, LogOut, Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, Key, CreditCard, MessageSquare, Settings, LogOut, Menu, X, QrCode } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { cn } from '../../utils/cn'
 
 const adminNavItems = [
@@ -8,18 +8,52 @@ const adminNavItems = [
   { name: 'Licenses', href: '/admin/licenses', icon: Key },
   { name: 'Payments', href: '/admin/payments', icon: CreditCard },
   { name: 'Messages', href: '/admin/messages', icon: MessageSquare },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: 'AI Settings', href: '/admin/settings', icon: Settings },
+  { name: 'Payment QR', href: '/admin/payment-settings', icon: QrCode },
 ]
 
 export function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    // Check if admin is authenticated
+    const token = localStorage.getItem('adminToken')
+    if (!token) {
+      navigate('/admin/login')
+    } else {
+      setIsAuthenticated(true)
+    }
+    setIsLoading(false)
+  }, [navigate])
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken')
+    navigate('/admin/login')
+  }
 
   const isActive = (href: string) => {
     if (href === '/admin') {
       return location.pathname === '/admin'
     }
     return location.pathname.startsWith(href)
+  }
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+        <div className="text-[#94a3b8]">Loading...</div>
+      </div>
+    )
+  }
+
+  // Don't render if not authenticated
+  if (!isAuthenticated) {
+    return null
   }
 
   return (
@@ -75,7 +109,10 @@ export function AdminLayout() {
 
           {/* Logout */}
           <div className="p-4 border-t border-[#334155]">
-            <button className="flex items-center space-x-3 px-4 py-3 w-full rounded-lg text-sm font-medium text-[#94a3b8] hover:bg-red-500/10 hover:text-red-400 transition-colors">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center space-x-3 px-4 py-3 w-full rounded-lg text-sm font-medium text-[#94a3b8] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+            >
               <LogOut className="w-5 h-5" />
               <span>Logout</span>
             </button>

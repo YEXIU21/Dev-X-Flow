@@ -19,6 +19,7 @@ import { AdminLicensesPage } from './pages/admin/AdminLicensesPage'
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage'
 import { AdminMessagesPage } from './pages/admin/AdminMessagesPage'
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage'
+import { AdminPaymentSettingsPage } from './pages/admin/AdminPaymentSettingsPage'
 import { SettingsPage } from './pages/customer/SettingsPage'
 import { LicensePage } from './pages/customer/LicensePage'
 import { EnterpriseDashboard } from './pages/enterprise/EnterpriseDashboard'
@@ -85,6 +86,7 @@ function App() {
               <Route path="/admin/payments" element={<AdminPaymentsPage />} />
               <Route path="/admin/messages" element={<AdminMessagesPage />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
+              <Route path="/admin/payment-settings" element={<AdminPaymentSettingsPage />} />
             </Route>
 
             {/* 404 */}

@@ -46,7 +46,7 @@ export function PricingSection() {
           <div className="pricing-badge">Free Trial</div>
           <h3>Starter</h3>
           <div className="price">Free</div>
-          <p style={{color: 'var(--text-secondary)'}}>30-day trial</p>
+          <p className="pricing-description">30-day trial</p>
           <div className="pricing-button-wrapper">
             <Link to="/register" className="btn btn-secondary pricing-btn">Start Free Trial</Link>
           </div>
@@ -67,7 +67,7 @@ export function PricingSection() {
           <div className="pricing-badge popular">Most Popular</div>
           <h3>Pro</h3>
           <div className="price">{plans[billing].pro.price}<span className="price-period">/mo</span></div>
-          <p style={{color: 'var(--text-secondary)'}}>
+          <p className="pricing-description">
             {billing === 'yearly' ? `${plans.yearly.pro.total} billed yearly • ` : 'Billed monthly • '}For solo developers
           </p>
           <div className="pricing-button-wrapper">
@@ -91,7 +91,7 @@ export function PricingSection() {
           <div className="pricing-badge">Best Value</div>
           <h3>Pro+</h3>
           <div className="price">{plans[billing].pro_plus.price}<span className="price-period">/mo</span></div>
-          <p style={{color: 'var(--text-secondary)'}}>
+          <p className="pricing-description">
             {billing === 'yearly' ? `${plans.yearly.pro_plus.total} billed yearly • ` : 'Billed monthly • '}For power users
           </p>
           <div className="pricing-button-wrapper">
@@ -114,7 +114,7 @@ export function PricingSection() {
           <div className="pricing-badge">Teams</div>
           <h3>Teams</h3>
           <div className="price">{plans[billing].teams.price}<span className="price-period">/mo</span></div>
-          <p style={{color: 'var(--text-secondary)'}}>
+          <p className="pricing-description">
             {billing === 'yearly' ? `${plans.yearly.teams.total} billed yearly • ` : 'Billed monthly • '}Up to 10 members
           </p>
           <div className="pricing-button-wrapper">
@@ -138,7 +138,7 @@ export function PricingSection() {
           <div className="pricing-badge">Enterprise</div>
           <h3>Enterprise</h3>
           <div className="price">Custom</div>
-          <p style={{color: 'var(--text-secondary)'}}>Large organizations</p>
+          <p className="pricing-description">Large organizations</p>
           <div className="pricing-button-wrapper">
             <Link to="/contact?plan=enterprise" className="btn btn-secondary pricing-btn">Contact Sales</Link>
           </div>
@@ -156,10 +156,10 @@ export function PricingSection() {
         </div>
       </div>
       
-      <div style={{textAlign: 'center', marginTop: '40px'}}>
-        <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>
+      <div className="pricing-footer">
+        <p className="pricing-footer-text">
           All paid plans include 1 year of updates and email support. 
-          <Link to="/compare" style={{color: 'var(--accent)', marginLeft: '8px'}}>Compare all features →</Link>
+          <Link to="/compare" className="pricing-footer-link">Compare all features →</Link>
         </p>
       </div>
     </section>

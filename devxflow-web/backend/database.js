@@ -67,7 +67,7 @@ const paymentSchema = new mongoose.Schema({
     customer_email: { type: String, required: true },
     customer_name: { type: String, required: true },
     amount: { type: Number, required: true },
-    plan: { type: String, required: true, enum: ['basic', 'professional'] },
+    plan: { type: String, required: true, enum: ['basic', 'professional', 'pro', 'pro_plus', 'teams'] },
     status: { 
         type: String, 
         enum: ['pending', 'verified', 'rejected'],
@@ -130,6 +130,30 @@ const customerSchema = new mongoose.Schema({
     last_login: { type: Date }
 });
 
+// Chat Message Schema
+const chatMessageSchema = new mongoose.Schema({
+    customer_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+    sender_id: { type: String, required: true },
+    sender_name: { type: String, required: true },
+    sender_role: { type: String, required: true, enum: ['customer', 'admin'] },
+    message: { type: String },
+    image_url: { type: String },
+    image_public_id: { type: String },
+    read: { type: Boolean, default: false },
+    created_at: { type: Date, default: Date.now }
+});
+
+// Payment Settings Schema (admin configurable)
+const paymentSettingsSchema = new mongoose.Schema({
+    setting_id: { type: String, default: 'default', unique: true },
+    qr_image_url: { type: String, required: true },
+    qr_public_id: { type: String },
+    gcash_number: { type: String, required: true },
+    gcash_account_name: { type: String },
+    updated_at: { type: Date, default: Date.now },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
+});
+
 // Create compound index for trial uniqueness
 trialSchema.index({ email: 1, device_fingerprint: 1 }, { unique: true });
 activationSchema.index({ license_id: 1, device_id: 1 }, { unique: true });
@@ -143,6 +167,8 @@ const Payment = mongoose.model('Payment', paymentSchema);
 const Message = mongoose.model('Message', messageSchema);
 const Trial = mongoose.model('Trial', trialSchema);
 const Customer = mongoose.model('Customer', customerSchema);
+const ChatMessage = mongoose.model('ChatMessage', chatMessageSchema);
+const PaymentSettings = mongoose.model('PaymentSettings', paymentSettingsSchema);
 
 // Database helpers (backward compatible with SQLite API)
 const dbHelpers = {
@@ -186,7 +212,9 @@ const dbHelpers = {
         Payment,
         Message,
         Trial,
-        Customer
+        Customer,
+        ChatMessage,
+        PaymentSettings
     }
 };
 

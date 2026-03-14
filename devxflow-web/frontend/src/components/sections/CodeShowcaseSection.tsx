@@ -305,7 +305,7 @@ export function CodeShowcaseSection() {
   }
 
   return (
-    <section className="code-showcase" id="showcase" style={{ background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)' }}>
+    <section className="code-showcase" id="showcase">
       <div className="section-title">
         <h2>See It In Action</h2>
         <p>Clean, intuitive interface designed for real developers</p>

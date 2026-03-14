@@ -198,6 +198,57 @@ router.get('/profile', verifyCustomerToken, async (req, res) => {
     }
 });
 
+// Get customer dashboard data
+router.get('/dashboard', verifyCustomerToken, async (req, res) => {
+    try {
+        const customer = await models.Customer.findById(req.customerId);
+        
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+        
+        // Get customer's licenses
+        const licenses = await models.License.find({ customer_email: customer.email })
+            .sort({ created_at: -1 })
+            .lean();
+        
+        // Get payments
+        const payments = await models.Payment.find({ customer_email: customer.email })
+            .sort({ created_at: -1 })
+            .limit(5)
+            .lean();
+        
+        // Get activation counts
+        const licensesWithCounts = await Promise.all(licenses.map(async (license) => {
+            const count = await models.Activation.countDocuments({ license_id: license._id });
+            return { ...license, activation_count: count };
+        }));
+        
+        res.json({
+            success: true,
+            customer: {
+                id: customer._id,
+                email: customer.email,
+                name: customer.name,
+                status: customer.status,
+                created_at: customer.created_at,
+                last_login: customer.last_login
+            },
+            licenses: licensesWithCounts,
+            payments: payments,
+            stats: {
+                total_licenses: licenses.length,
+                active_licenses: licenses.filter(l => l.status === 'active').length,
+                pending_payments: payments.filter(p => p.status === 'pending').length
+            }
+        });
+        
+    } catch (error) {
+        console.error('Dashboard error:', error);
+        res.status(500).json({ error: 'Failed to get dashboard data' });
+    }
+});
+
 // Update customer profile
 router.put('/profile', verifyCustomerToken, async (req, res) => {
     try {
