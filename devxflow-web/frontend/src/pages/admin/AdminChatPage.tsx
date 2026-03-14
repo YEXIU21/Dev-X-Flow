@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSocket } from '../../hooks/useSocket'
 import { ChatWindow } from '../../components/chat/ChatWindow'
+import { Menu, X, MessageSquare } from 'lucide-react'
 
 interface Customer {
   _id: string
@@ -12,6 +13,7 @@ interface Customer {
 export function AdminChatPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
   // Get admin info from localStorage
   const adminData = localStorage.getItem('admin')
@@ -23,7 +25,6 @@ export function AdminChatPage() {
     messages,
     sendMessage,
     sendTyping,
-    isUserTyping,
     error
   } = useSocket({
     userId: adminId,
@@ -53,6 +54,7 @@ export function AdminChatPage() {
 
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer)
+    setIsSidebarOpen(false) // Close sidebar on mobile after selection
   }
 
   const handleSendMessage = (message: string, image?: string) => {
@@ -62,10 +64,24 @@ export function AdminChatPage() {
 
   return (
     <div className="admin-chat-page">
-      <div className="admin-chat-sidebar">
-        <h2>Customers</h2>
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+      )}
+      
+      {/* Sidebar */}
+      <div className={`admin-chat-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h2>Messages</h2>
+          <button className="close-sidebar-btn" onClick={() => setIsSidebarOpen(false)} title="Close sidebar">
+            <X size={20} />
+          </button>
+        </div>
         {customers.length === 0 ? (
-          <p className="no-customers">No active chats</p>
+          <div className="no-customers">
+            <MessageSquare size={32} className="no-chats-icon" />
+            <p>No active chats</p>
+          </div>
         ) : (
           <ul className="customer-list">
             {customers.map((customer) => (
@@ -75,20 +91,36 @@ export function AdminChatPage() {
                 onClick={() => handleSelectCustomer(customer)}
               >
                 <div className="customer-avatar">
-                  {customer.name.charAt(0).toUpperCase()}
+                  {(customer.name || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="customer-info">
-                  <span className="customer-name">{customer.name}</span>
-                  <span className="customer-email">{customer.email}</span>
+                  <span className="customer-name">{customer.name || 'Unknown'}</span>
+                  <span className="customer-email">{customer.email || 'No email'}</span>
                 </div>
-                <span className={`status-badge ${customer.status}`} />
+                <span className={`status-badge ${customer.status || 'offline'}`} />
               </li>
             ))}
           </ul>
         )}
       </div>
       
+      {/* Main Chat Area */}
       <div className="admin-chat-main">
+        {/* Mobile Header */}
+        <div className="chat-mobile-header">
+          <button className="menu-btn" onClick={() => setIsSidebarOpen(true)} title="Open menu">
+            <Menu size={24} />
+          </button>
+          {selectedCustomer && (
+            <div className="mobile-customer-info">
+              <div className="customer-avatar-small">
+                {(selectedCustomer.name || 'U').charAt(0).toUpperCase()}
+              </div>
+              <span>{selectedCustomer.name || 'Unknown'}</span>
+            </div>
+          )}
+        </div>
+        
         {selectedCustomer ? (
           <>
             <div className="chat-header-info">
@@ -105,7 +137,6 @@ export function AdminChatPage() {
             <ChatWindow
               messages={messages}
               isConnected={isConnected}
-              isUserTyping={isUserTyping}
               onSendMessage={handleSendMessage}
               onTyping={sendTyping}
               currentUserId={adminId}

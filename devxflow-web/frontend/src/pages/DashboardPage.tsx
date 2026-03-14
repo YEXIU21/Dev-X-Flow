@@ -87,7 +87,7 @@ export function DashboardPage() {
               <GitBranch size={24} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">{stats.totalCommits.toLocaleString()}</span>
+              <span className="stat-value">{(stats.totalCommits ?? 0).toLocaleString()}</span>
               <span className="stat-label">Total Commits</span>
             </div>
           </div>
@@ -97,7 +97,7 @@ export function DashboardPage() {
               <FolderGit2 size={24} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">{stats.repositories}</span>
+              <span className="stat-value">{stats.repositories ?? 0}</span>
               <span className="stat-label">Repositories</span>
             </div>
           </div>
@@ -107,7 +107,7 @@ export function DashboardPage() {
               <Rocket size={24} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">{stats.activeProjects}</span>
+              <span className="stat-value">{stats.activeProjects ?? 0}</span>
               <span className="stat-label">Active Projects</span>
             </div>
           </div>
@@ -117,7 +117,7 @@ export function DashboardPage() {
               <RefreshCw size={24} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">{stats.lastSync}</span>
+              <span className="stat-value">{stats.lastSync ?? 'Never'}</span>
               <span className="stat-label">Last Sync</span>
             </div>
           </div>

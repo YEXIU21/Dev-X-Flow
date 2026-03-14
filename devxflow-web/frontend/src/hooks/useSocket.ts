@@ -80,9 +80,14 @@ export function useSocket({
     })
 
     newSocket.on('receive_message', (message: ChatMessage) => {
-      console.log('[Socket] Received message:', message)
-      setMessages((prev) => [...prev, message])
-    })
+      console.log('[Socket] Received message:', message);
+      setMessages((prev) => {
+        console.log('[Socket] Previous messages count:', prev.length);
+        const newMessages = [...prev, message];
+        console.log('[Socket] New messages count:', newMessages.length);
+        return newMessages;
+      });
+    });
 
     newSocket.on('user_typing', (data: { customerId?: string; isTyping: boolean }) => {
       setIsUserTyping(data.isTyping)

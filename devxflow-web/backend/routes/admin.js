@@ -254,6 +254,29 @@ router.post('/change-password', async (req, res) => {
     }
 });
 
+// Get customers list for admin chat
+router.get('/customers', async (req, res) => {
+    try {
+        // Get all customers with their basic info
+        const customers = await models.Customer.find({}, '-password_hash')
+            .sort({ created_at: -1 })
+            .lean();
+
+        res.json({
+            success: true,
+            customers: customers.map(c => ({
+                _id: c._id,
+                email: c.email,
+                full_name: c.full_name,
+                created_at: c.created_at
+            }))
+        });
+    } catch (error) {
+        console.error('Get customers error:', error);
+        res.status(500).json({ error: 'Failed to get customers' });
+    }
+});
+
 // List all users (Admins and Customers)
 router.get('/users', async (req, res) => {
     try {

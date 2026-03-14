@@ -15,7 +15,6 @@ interface ChatMessage {
 interface ChatWindowProps {
   messages: ChatMessage[]
   isConnected: boolean
-  isUserTyping: boolean
   onSendMessage: (message: string, image?: string) => void
   onTyping: (isTyping: boolean) => void
   currentUserId: string
@@ -24,7 +23,6 @@ interface ChatWindowProps {
 export function ChatWindow({
   messages,
   isConnected,
-  isUserTyping,
   onSendMessage,
   onTyping,
   currentUserId
@@ -109,22 +107,12 @@ export function ChatWindow({
 
   return (
     <div className="chat-window">
-      {/* Header */}
-      <div className="chat-header">
-        <div className="chat-status">
-          <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
-          <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
-        </div>
-        {isUserTyping && (
-          <span className="typing-indicator">Someone is typing...</span>
-        )}
-      </div>
-
       {/* Messages */}
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
-            <p>No messages yet. Start the conversation!</p>
+            <p>No messages yet</p>
+            <small>Start the conversation!</small>
           </div>
         ) : (
           messages.map((msg) => (
@@ -132,10 +120,6 @@ export function ChatWindow({
               key={msg.id}
               className={`chat-message ${msg.senderId === currentUserId ? 'own' : 'other'}`}
             >
-              <div className="message-header">
-                <span className="sender-name">{msg.senderName}</span>
-                <span className="message-time">{formatTime(msg.timestamp)}</span>
-              </div>
               {msg.imageUrl && (
                 <div className="message-image">
                   <img src={msg.imageUrl} alt="Shared" />
@@ -144,6 +128,7 @@ export function ChatWindow({
               {msg.message && (
                 <p className="message-text">{msg.message}</p>
               )}
+              <span className="message-time">{formatTime(msg.timestamp)}</span>
             </div>
           ))
         )}
@@ -155,7 +140,7 @@ export function ChatWindow({
         <div className="image-preview-container">
           <img src={imagePreview} alt="Preview" className="image-preview" />
           <button onClick={removeImage} className="remove-image-btn" title="Remove image" aria-label="Remove image">
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
       )}
@@ -176,7 +161,7 @@ export function ChatWindow({
           title="Attach image"
           aria-label="Attach image"
         >
-          <ImageIcon size={20} />
+          <ImageIcon size={18} />
         </button>
         
         <input
@@ -195,12 +180,206 @@ export function ChatWindow({
           className="send-btn"
         >
           {isUploading ? (
-            <Loader2 size={20} className="spinner" />
+            <Loader2 size={18} className="spinner" />
           ) : (
-            <Send size={20} />
+            <Send size={18} />
           )}
         </button>
       </div>
+
+      <style>{`
+        .chat-window {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          background: var(--bg-secondary, #12121a);
+        }
+        
+        .chat-messages {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        
+        .chat-empty {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-secondary, #888);
+          text-align: center;
+        }
+        
+        .chat-empty p {
+          margin: 0;
+          font-size: 14px;
+        }
+        
+        .chat-empty small {
+          font-size: 12px;
+          opacity: 0.7;
+        }
+        
+        .chat-message {
+          max-width: 75%;
+          padding: 10px 14px;
+          border-radius: 16px;
+          font-size: 14px;
+          line-height: 1.4;
+        }
+        
+        .chat-message.own {
+          align-self: flex-end;
+          background: var(--accent, #00d4ff);
+          color: #000;
+          border-bottom-right-radius: 4px;
+        }
+        
+        .chat-message.other {
+          align-self: flex-start;
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary, #e0e0e0);
+          border-bottom-left-radius: 4px;
+        }
+        
+        .message-text {
+          margin: 0;
+          word-wrap: break-word;
+        }
+        
+        .message-image {
+          margin-bottom: 6px;
+        }
+        
+        .message-image img {
+          max-width: 100%;
+          border-radius: 8px;
+        }
+        
+        .message-time {
+          display: block;
+          font-size: 10px;
+          opacity: 0.6;
+          margin-top: 4px;
+          text-align: right;
+        }
+        
+        .image-preview-container {
+          position: relative;
+          padding: 8px 16px;
+          background: rgba(0, 0, 0, 0.2);
+        }
+        
+        .image-preview {
+          height: 60px;
+          border-radius: 8px;
+          object-fit: cover;
+        }
+        
+        .remove-image-btn {
+          position: absolute;
+          top: 12px;
+          right: 20px;
+          background: rgba(0, 0, 0, 0.6);
+          border: none;
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: #fff;
+        }
+        
+        .chat-input-container {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 16px;
+          background: rgba(0, 0, 0, 0.3);
+          border-top: 1px solid rgba(0, 212, 255, 0.1);
+        }
+        
+        .file-input-hidden {
+          display: none;
+        }
+        
+        .attach-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary, #888);
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 8px;
+          transition: all 0.2s;
+        }
+        
+        .attach-btn:hover {
+          color: var(--accent, #00d4ff);
+          background: rgba(0, 212, 255, 0.1);
+        }
+        
+        .chat-input {
+          flex: 1;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 20px;
+          padding: 10px 16px;
+          font-size: 14px;
+          color: var(--text-primary, #e0e0e0);
+          outline: none;
+          transition: all 0.2s;
+        }
+        
+        .chat-input:focus {
+          border-color: var(--accent, #00d4ff);
+        }
+        
+        .chat-input::placeholder {
+          color: var(--text-secondary, #888);
+        }
+        
+        .chat-input:disabled {
+          opacity: 0.5;
+        }
+        
+        .send-btn {
+          background: var(--accent, #00d4ff);
+          border: none;
+          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: #000;
+          transition: all 0.2s;
+        }
+        
+        .send-btn:hover:not(:disabled) {
+          transform: scale(1.05);
+        }
+        
+        .send-btn:disabled {
+          opacity: 0.3;
+          cursor: not-allowed;
+        }
+        
+        .spinner {
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

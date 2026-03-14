@@ -137,13 +137,14 @@ export function RegisterPage() {
           font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
           background: #0a0a0f;
           color: var(--text-primary);
-          min-height: 100vh;
+          min-height: 100dvh;
           width: 100%;
           display: flex;
           align-items: flex-start;
           justify-content: center;
           padding: 100px 20px 40px;
           overflow-y: auto;
+          position: relative;
         }
         
         .register-container {

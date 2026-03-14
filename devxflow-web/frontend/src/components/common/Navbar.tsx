@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronDown, Menu, User, X, LogOut, Settings, Key } from 'lucide-react'
+import { ChevronDown, Menu, User, X, LogOut, Settings, Key, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -50,6 +50,9 @@ export function Navbar() {
           <>
             <Link to="/dashboard" onClick={closeMobile}>Dashboard</Link>
             <Link to="/license" onClick={closeMobile}>License</Link>
+            <Link to={`/customer/chat/${customer?.id}`} onClick={closeMobile}>
+              <MessageCircle size={16} /> Chat
+            </Link>
             
             <div className={`nav-dropdown${profileOpen ? ' is-open' : ''}`}>
               <button

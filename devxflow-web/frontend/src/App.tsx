@@ -23,6 +23,8 @@ import { AdminPaymentSettingsPage } from './pages/admin/AdminPaymentSettingsPage
 import { SettingsPage } from './pages/customer/SettingsPage'
 import { LicensePage } from './pages/customer/LicensePage'
 import { EnterpriseDashboard } from './pages/enterprise/EnterpriseDashboard'
+import { CustomerChatPage } from './pages/customer/CustomerChatPage'
+import { AdminChatPage } from './pages/admin/AdminChatPage'
 
 // Placeholder pages - to be implemented
 function PricingPage() {
@@ -82,11 +84,17 @@ function App() {
             {/* Admin Routes */}
             <Route element={<AdminLayout />}>
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/chat" element={<AdminChatPage />} />
               <Route path="/admin/licenses" element={<AdminLicensesPage />} />
               <Route path="/admin/payments" element={<AdminPaymentsPage />} />
               <Route path="/admin/messages" element={<AdminMessagesPage />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
               <Route path="/admin/payment-settings" element={<AdminPaymentSettingsPage />} />
+            </Route>
+
+            {/* Customer Chat Route */}
+            <Route element={<MainLayout />}>
+              <Route path="/customer/chat/:customerId" element={<CustomerChatPage />} />
             </Route>
 
             {/* 404 */}

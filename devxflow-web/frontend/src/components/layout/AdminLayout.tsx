@@ -1,10 +1,11 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Key, CreditCard, MessageSquare, Settings, LogOut, Menu, X, QrCode } from 'lucide-react'
+import { LayoutDashboard, Key, CreditCard, MessageSquare, Settings, LogOut, Menu, X, QrCode, MessageCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '../../utils/cn'
 
 const adminNavItems = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { name: 'Chat', href: '/admin/chat', icon: MessageCircle },
   { name: 'Licenses', href: '/admin/licenses', icon: Key },
   { name: 'Payments', href: '/admin/payments', icon: CreditCard },
   { name: 'Messages', href: '/admin/messages', icon: MessageSquare },
